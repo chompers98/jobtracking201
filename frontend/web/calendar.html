@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>JobTracker – Calendar</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar">
+        <div class="sidebar-logo">JobTracker</div>
+        <p class="nav-section-title">Menu</p>
+        <ul class="nav-list">
+          <li class="nav-item">
+            <a href="dashboard.html" class="nav-link">
+              <span class="icon icon-dashboard"></span>
+              Dashboard
+            </a>
+          </li>
+          <li class="nav-item">
+            <a href="index.html" class="nav-link">
+              <span class="icon icon-applications"></span>
+              Applications
+            </a>
+          </li>
+          <li class="nav-item">
+            <a href="calendar.html" class="nav-link active">
+              <span class="icon icon-calendar"></span>
+              Calendar View
+            </a>
+          </li>
+          <li class="nav-item">
+            <a href="integrations.html" class="nav-link">
+              <span class="icon icon-integrations"></span>
+              Integrations
+            </a>
+          </li>
+          <li class="nav-item">
+            <a href="settings.html" class="nav-link">
+              <span class="icon icon-settings"></span>
+              Settings
+            </a>
+          </li>
+        </ul>
+      </aside>
+
+      <div class="main-area">
+        <header class="top-bar">
+          <div class="top-bar-right">
+            <span>Logout</span>
+            <div class="avatar">JD</div>
+          </div>
+        </header>
+
+        <main class="content" id="calendar-root">
+          <div class="page-header">
+            <div class="page-title-group">
+              <h1>Calendar</h1>
+              <p>Deadlines &amp; Interviews</p>
+            </div>
+            <div class="calendar-controls">
+              <button class="primary-btn" id="add-event-btn">+ Add Event</button>
+              <div class="pill-filters">
+                <button class="pill-btn active" data-view="month">Month</button>
+                <button class="pill-btn" data-view="week">Week</button>
+                <button class="pill-btn" data-view="day">Day</button>
+              </div>
+            </div>
+          </div>
+
+          <section class="card">
+            <div class="calendar-header">
+              <button class="calendar-nav-btn" id="prev-btn">&larr;</button>
+              <div class="calendar-title-group">
+                <span id="calendar-month-label"></span>
+                <button class="today-btn" id="today-btn">Today</button>
+              </div>
+              <button class="calendar-nav-btn" id="next-btn">&rarr;</button>
+            </div>
+
+            <!-- Month View -->
+            <div id="month-view" class="calendar-view">
+              <table class="calendar-grid">
+                <thead>
+                  <tr>
+                    <th>SUN</th>
+                    <th>MON</th>
+                    <th>TUE</th>
+                    <th>WED</th>
+                    <th>THU</th>
+                    <th>FRI</th>
+                    <th>SAT</th>
+                  </tr>
+                </thead>
+                <tbody id="calendar-tbody"></tbody>
+              </table>
+            </div>
+
+            <!-- Week View -->
+            <div id="week-view" class="calendar-view" style="display: none;">
+              <div class="week-header">
+                <div class="week-time-column"></div>
+                <div class="week-days-header" id="week-days-header"></div>
+              </div>
+              <div class="week-grid-container">
+                <div class="week-time-labels" id="week-time-labels"></div>
+                <div class="week-grid" id="week-grid"></div>
+              </div>
+            </div>
+
+            <!-- Day View -->
+            <div id="day-view" class="calendar-view" style="display: none;">
+              <div class="day-header">
+                <div class="day-time-column"></div>
+                <div class="day-date-header" id="day-date-header"></div>
+              </div>
+              <div class="day-grid-container">
+                <div class="day-time-labels" id="day-time-labels"></div>
+                <div class="day-grid" id="day-grid"></div>
+              </div>
+            </div>
+          </section>
+        </main>
+      </div>
+    </div>
+
+    <!-- Event Modal -->
+    <div id="event-modal" class="modal">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2 id="event-modal-title">Add Event</h2>
+          <span class="modal-close">&times;</span>
+        </div>
+        <form id="event-form">
+          <div class="form-group">
+            <label for="event-type">Event Type</label>
+            <select id="event-type" required>
+              <option value="application">Application Deadline</option>
+              <option value="interview">Interview/Screen</option>
+              <option value="assignment">Assignment</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="event-title">Title</label>
+            <input type="text" id="event-title" placeholder="Event title" required />
+          </div>
+
+          <div class="form-group">
+            <label for="event-application-id">Application ID (Optional)</label>
+            <input type="number" id="event-application-id" placeholder="Link to application" />
+          </div>
+
+          <!-- Application-specific fields -->
+          <div id="application-fields" style="display: block;">
+            <div class="form-group">
+              <label for="event-deadline">Deadline</label>
+              <input type="date" id="event-deadline" />
+            </div>
+          </div>
+
+          <!-- Interview-specific fields -->
+          <div id="interview-fields" style="display: none;">
+            <div class="form-group">
+              <label for="event-start-date">Start Date</label>
+              <input type="date" id="event-start-date" />
+            </div>
+            <div class="form-group">
+              <label for="event-end-date">End Date (Optional)</label>
+              <input type="date" id="event-end-date" />
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label for="event-start-time">Start Time</label>
+                <input type="time" id="event-start-time" />
+              </div>
+              <div class="form-group">
+                <label for="event-end-time">End Time</label>
+                <input type="time" id="event-end-time" />
+              </div>
+            </div>
+            <div class="form-group">
+              <label for="event-location">Location</label>
+              <input type="text" id="event-location" placeholder="Office, address, etc." />
+            </div>
+            <div class="form-group">
+              <label for="event-meeting-link">Meeting Link</label>
+              <input type="url" id="event-meeting-link" placeholder="Zoom, Google Meet, etc." />
+            </div>
+          </div>
+
+          <!-- Assignment-specific fields -->
+          <div id="assignment-fields" style="display: none;">
+            <div class="form-group">
+              <label for="event-assignment-deadline">Deadline</label>
+              <input type="date" id="event-assignment-deadline" />
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="event-color">Color</label>
+            <select id="event-color">
+              <option value="red">Red</option>
+              <option value="orange">Orange</option>
+              <option value="green">Green</option>
+              <option value="blue">Blue</option>
+              <option value="purple">Purple</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="event-notes">Notes</label>
+            <textarea id="event-notes" rows="3" placeholder="Additional notes..."></textarea>
+          </div>
+
+          <div class="modal-actions">
+            <button type="button" id="event-delete-btn" class="danger-btn">Delete</button>
+            <div class="modal-actions-right">
+              <button type="button" class="secondary-btn modal-close">Cancel</button>
+              <button type="button" id="event-submit-btn" class="primary-btn">Save Event</button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <script src="app.js"></script>
+  </body>
+</html>

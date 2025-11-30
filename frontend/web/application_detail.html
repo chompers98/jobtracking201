@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>JobTracker – Application Details</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar">
+        <div class="sidebar-logo">JobTracker</div>
+        <p class="nav-section-title">Menu</p>
+        <ul class="nav-list">
+          <li class="nav-item">
+            <a href="dashboard.html" class="nav-link">
+              <span class="icon icon-dashboard"></span>
+              Dashboard
+            </a>
+          </li>
+          <li class="nav-item">
+            <a href="index.html" class="nav-link active">
+              <span class="icon icon-applications"></span>
+              Applications
+            </a>
+          </li>
+          <li class="nav-item">
+            <a href="calendar.html" class="nav-link">
+              <span class="icon icon-calendar"></span>
+              Calendar View
+            </a>
+          </li>
+          <li class="nav-item">
+            <a href="integrations.html" class="nav-link">
+              <span class="icon icon-integrations"></span>
+              Integrations
+            </a>
+          </li>
+          <li class="nav-item">
+            <a href="settings.html" class="nav-link">
+              <span class="icon icon-settings"></span>
+              Settings
+            </a>
+          </li>
+        </ul>
+      </aside>
+
+      <div class="main-area">
+        <header class="top-bar">
+          <div class="top-bar-right">
+            <span>Logout</span>
+            <div class="avatar">JD</div>
+          </div>
+        </header>
+
+        <main class="content" id="detail-root">
+          <a href="index.html" class="back-link">&larr; Back to Applications</a>
+
+          <section class="card">
+            <div class="detail-header">
+              <div class="detail-header-left">
+                <h2 id="detail-title">Software Engineer</h2>
+                <p id="detail-company">Google Inc.</p>
+              </div>
+              <div id="detail-status-tag">
+                <!-- status tag injected here -->
+              </div>
+            </div>
+
+            <div class="detail-layout">
+              <div>
+                <dl class="detail-grid" id="detail-grid">
+                  <!-- populated by JS -->
+                </dl>
+
+                <div class="timeline">
+                  <h3>Timeline &amp; Status</h3>
+                  <div id="timeline-list"></div>
+                </div>
+              </div>
+
+              <div>
+                <div class="card">
+                  <h3>Links &amp; Documents</h3>
+                  <div id="docs-container" class="doc-list"></div>
+                  <button class="primary-btn secondary" style="margin-top: 10px;">
+                    + Add Document
+                  </button>
+                </div>
+
+                <div class="card notes-card">
+                  <h3>Notes</h3>
+                  <textarea
+                    id="notes-textarea"
+                    class="notes-textarea"
+                    placeholder="Add any additional notes, contacts, or important information..."
+                  ></textarea>
+                </div>
+              </div>
+            </div>
+          </section>
+        </main>
+      </div>
+    </div>
+
+    <!-- Event Modal -->
+    <div id="event-modal" class="modal">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2 id="event-modal-title">Add Event</h2>
+          <span class="modal-close">&times;</span>
+        </div>
+        <form id="event-form">
+          <div class="form-group">
+            <label for="event-type">Event Type</label>
+            <select id="event-type" required>
+              <option value="application">Application Deadline</option>
+              <option value="interview">Interview/Screen</option>
+              <option value="assignment">Assignment</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="event-title">Title</label>
+            <input type="text" id="event-title" placeholder="Event title" required />
+          </div>
+
+          <div class="form-group">
+            <label for="event-application-id">Application ID (Optional)</label>
+            <input type="number" id="event-application-id" placeholder="Link to application" />
+          </div>
+
+          <!-- Application-specific fields -->
+          <div id="application-fields" style="display: block;">
+            <div class="form-group">
+              <label for="event-deadline">Deadline</label>
+              <input type="date" id="event-deadline" />
+            </div>
+          </div>
+
+          <!-- Interview-specific fields -->
+          <div id="interview-fields" style="display: none;">
+            <div class="form-group">
+              <label for="event-start-date">Start Date</label>
+              <input type="date" id="event-start-date" />
+            </div>
+            <div class="form-group">
+              <label for="event-end-date">End Date (Optional)</label>
+              <input type="date" id="event-end-date" />
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label for="event-start-time">Start Time</label>
+                <input type="time" id="event-start-time" />
+              </div>
+              <div class="form-group">
+                <label for="event-end-time">End Time</label>
+                <input type="time" id="event-end-time" />
+              </div>
+            </div>
+            <div class="form-group">
+              <label for="event-location">Location</label>
+              <input type="text" id="event-location" placeholder="Office, address, etc." />
+            </div>
+            <div class="form-group">
+              <label for="event-meeting-link">Meeting Link</label>
+              <input type="url" id="event-meeting-link" placeholder="Zoom, Google Meet, etc." />
+            </div>
+          </div>
+
+          <!-- Assignment-specific fields -->
+          <div id="assignment-fields" style="display: none;">
+            <div class="form-group">
+              <label for="event-assignment-deadline">Deadline</label>
+              <input type="date" id="event-assignment-deadline" />
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="event-color">Color</label>
+            <select id="event-color">
+              <option value="red">Red</option>
+              <option value="orange">Orange</option>
+              <option value="green">Green</option>
+              <option value="blue">Blue</option>
+              <option value="purple">Purple</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="event-notes">Notes</label>
+            <textarea id="event-notes" rows="3" placeholder="Additional notes..."></textarea>
+          </div>
+
+          <div class="modal-actions">
+            <button type="button" id="event-delete-btn" class="danger-btn">Delete</button>
+            <div class="modal-actions-right">
+              <button type="button" class="secondary-btn modal-close">Cancel</button>
+              <button type="button" id="event-submit-btn" class="primary-btn">Save Event</button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <script src="app.js"></script>
+  </body>
+</html>
+
+

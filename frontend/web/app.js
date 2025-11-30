@@ -1,0 +1,1179 @@
+const API_BASE_URL = "http://localhost:5000";
+
+async function fetchJson(path, options = {}) {
+  const res = await fetch(`${API_BASE_URL}${path}`, {
+    headers: { "Content-Type": "application/json" },
+    ...options,
+  });
+  if (!res.ok) {
+    throw new Error(`Request failed: ${res.status}`);
+  }
+  return res.json();
+}
+
+// --- Applications list page --------------------------------------------------
+
+async function initApplicationsPage() {
+  const tableBody = document.querySelector("#applications-tbody");
+  if (!tableBody) return;
+
+  const searchInput = document.querySelector("#search-input");
+  const filterButtons = document.querySelectorAll("[data-filter]");
+  const countLabel = document.querySelector("#applications-count");
+
+  let allApps = [];
+  let currentFilter = "all";
+
+  function statusIsActive(status) {
+    return status !== "Offered" && status !== "Rejected";
+  }
+
+  function applyFilterAndRender() {
+    const term = (searchInput?.value || "").toLowerCase();
+    let filtered = allApps.filter((a) => {
+      const matchTerm =
+        !term ||
+        a.company.toLowerCase().includes(term) ||
+        a.title.toLowerCase().includes(term);
+      const matchFilter =
+        currentFilter === "all"
+          ? true
+          : currentFilter === "active"
+          ? statusIsActive(a.status)
+          : !statusIsActive(a.status);
+      return matchTerm && matchFilter;
+    });
+
+    tableBody.innerHTML = "";
+    filtered.forEach((app, idx) => {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>#${String(app.id).padStart(3, "0")}</td>
+        <td>${app.company}</td>
+        <td>${app.title}</td>
+        <td class="status-cell">${renderStatusTag(app.status)}</td>
+        <td>${formatShortDate(app.deadline)}</td>
+        <td class="link-cell"><a href="application_detail.html?id=${app.id}">View</a></td>
+      `;
+      tableBody.appendChild(tr);
+    });
+
+    if (countLabel) {
+      countLabel.textContent = `Showing ${filtered.length} of ${allApps.length}`;
+    }
+  }
+
+  try {
+    allApps = await fetchJson("/api/apps");
+    if (searchInput) {
+      searchInput.addEventListener("input", () => applyFilterAndRender());
+    }
+    filterButtons.forEach((btn) =>
+      btn.addEventListener("click", () => {
+        currentFilter = btn.dataset.filter || "all";
+        filterButtons.forEach((b) => b.classList.remove("active"));
+        btn.classList.add("active");
+        applyFilterAndRender();
+      })
+    );
+    applyFilterAndRender();
+  } catch (err) {
+    console.error(err);
+  }
+}
+
+// --- Detail page -------------------------------------------------------------
+
+async function initDetailPage() {
+  const detailRoot = document.querySelector("#detail-root");
+  if (!detailRoot) return;
+
+  const params = new URLSearchParams(window.location.search);
+  const id = params.get("id");
+  if (!id) return;
+
+  try {
+    const app = await fetchJson(`/api/apps/${id}`);
+    const appEvents = await fetchJson(`/api/apps/${id}/events`);
+
+    const titleEl = document.querySelector("#detail-title");
+    const companyEl = document.querySelector("#detail-company");
+    const statusEl = document.querySelector("#detail-status-tag");
+    const detailGrid = document.querySelector("#detail-grid");
+    const timelineList = document.querySelector("#timeline-list");
+    const notesTextarea = document.querySelector("#notes-textarea");
+    const docsContainer = document.querySelector("#docs-container");
+
+    if (titleEl) titleEl.textContent = app.title;
+    if (companyEl) companyEl.textContent = `${app.company} Inc.`;
+    if (statusEl) {
+      statusEl.innerHTML = renderStatusDropdown(app.status, app.id);
+      
+      // Add event listener for status change
+      const statusDropdown = statusEl.querySelector(".status-dropdown");
+      if (statusDropdown) {
+        statusDropdown.addEventListener("change", async (e) => {
+          const newStatus = e.target.value;
+          try {
+            await fetchJson(`/api/apps/${app.id}/status`, {
+              method: "PUT",
+              body: JSON.stringify({ status: newStatus }),
+            });
+            // Show success feedback
+            const originalBg = statusDropdown.style.backgroundColor;
+            statusDropdown.style.backgroundColor = "#d1fae5";
+            setTimeout(() => {
+              statusDropdown.style.backgroundColor = originalBg;
+            }, 500);
+          } catch (err) {
+            console.error("Failed to update status:", err);
+            alert("Failed to update status. Please try again.");
+            // Revert dropdown
+            statusDropdown.value = app.status;
+          }
+        });
+      }
+    }
+
+    if (detailGrid) {
+      detailGrid.innerHTML = `
+        <div>
+          <dt>Location</dt>
+          <dd>${app.location || "-"}</dd>
+        </div>
+        <div>
+          <dt>Job Type</dt>
+          <dd>${app.jobType || "-"}</dd>
+        </div>
+        <div>
+          <dt>Application Date</dt>
+          <dd>${formatShortDate(app.appliedAt)}</dd>
+        </div>
+        <div>
+          <dt>Deadline</dt>
+          <dd>${formatShortDate(app.deadline)}</dd>
+        </div>
+        <div>
+          <dt>Salary Range</dt>
+          <dd>${app.salaryRange || "-"}</dd>
+        </div>
+        <div>
+          <dt>Experience</dt>
+          <dd>${app.experience || "-"}</dd>
+        </div>
+        <div style="grid-column: 1 / -1;">
+          <dt>Job Link</dt>
+          <dd><a href="${app.jobLink || "#"}" target="_blank" rel="noreferrer">${app.jobLink ||
+        "-"}</a></dd>
+        </div>
+      `;
+    }
+
+    if (timelineList) {
+      timelineList.innerHTML = "";
+      
+      // Combine actual events with auto-generated deadline event
+      const allTimelineItems = [...appEvents];
+      
+      // Auto-generate Application Deadline event if application has a deadline
+      if (app.deadline) {
+        allTimelineItems.push({
+          id: null, // Virtual event, no ID
+          type: "application",
+          title: "Application Deadline",
+          deadline: app.deadline,
+          applicationId: app.id,
+          notes: "",
+          isAutoGenerated: true
+        });
+      }
+      
+      // Render events as timeline items
+      if (allTimelineItems.length > 0) {
+        allTimelineItems
+          .sort((a, b) => {
+            const dateA = a.deadline || a.startDate;
+            const dateB = b.deadline || b.startDate;
+            return new Date(dateB) - new Date(dateA);
+          })
+          .forEach((event, index) => {
+            const dotClass = event.type === "interview" ? "green" : event.type === "assignment" ? "orange" : "red";
+            const item = document.createElement("div");
+            item.className = "timeline-item";
+            
+            // Only make it clickable if it's not auto-generated
+            if (!event.isAutoGenerated) {
+              item.style.cursor = "pointer";
+            }
+            
+            let eventDate = event.deadline || event.startDate;
+            let eventDescription = "";
+            
+            if (event.type === "interview") {
+              eventDescription = event.location || event.meetingLink || "";
+              if (event.startTime) {
+                eventDescription = `${event.startTime}${event.endTime ? ' - ' + event.endTime : ''} · ${eventDescription}`;
+              }
+            } else if (event.notes) {
+              eventDescription = event.notes;
+            }
+            
+            // Add auto-generated indicator
+            const titleSuffix = event.isAutoGenerated ? ' <span style="font-size: 0.75rem; color: #9ca3af;">(Auto)</span>' : '';
+            
+            item.innerHTML = `
+              <div class="timeline-dot ${dotClass}"></div>
+              <div>
+                <div class="timeline-content-title">${event.title}${titleSuffix}</div>
+                <div class="timeline-content-meta">${formatLongDate(eventDate)}${eventDescription ? " · " + eventDescription : ""}</div>
+              </div>
+            `;
+            
+            // Only add click handler if not auto-generated
+            if (!event.isAutoGenerated) {
+              item.addEventListener("click", () => {
+                openEventModal(event.id);
+              });
+            }
+            
+            timelineList.appendChild(item);
+          });
+      } else {
+        // Show empty state when no events
+        const emptyState = document.createElement("div");
+        emptyState.className = "timeline-empty-state";
+        emptyState.innerHTML = `<p>No events yet. Click the button below to add your first event.</p>`;
+        timelineList.appendChild(emptyState);
+      }
+      
+      // Add event button
+      const addEventBtn = document.createElement("button");
+      addEventBtn.className = "add-timeline-btn";
+      addEventBtn.textContent = "+ Add Event";
+      addEventBtn.addEventListener("click", () => {
+        openEventModalForApp(parseInt(id));
+      });
+      timelineList.appendChild(addEventBtn);
+    }
+
+    if (notesTextarea) {
+      notesTextarea.value = app.notes || "";
+      notesTextarea.addEventListener("change", () => {
+        // purely front-end for now; no persistence needed for homework
+      });
+    }
+
+    if (docsContainer) {
+      docsContainer.innerHTML = "";
+      (app.documents || []).forEach((doc) => {
+        const row = document.createElement("div");
+        row.className = "doc-item";
+        row.innerHTML = `
+          <span>${doc.label}</span>
+          <a href="${doc.url || "#"}" target="_blank" rel="noreferrer">Open</a>
+        `;
+        docsContainer.appendChild(row);
+      });
+    }
+
+    // Setup modal handlers for detail page
+    const eventTypeSelect = document.getElementById("event-type");
+    if (eventTypeSelect) {
+      eventTypeSelect.addEventListener("change", (e) => {
+        updateEventFormFields(e.target.value);
+      });
+    }
+
+    const modal = document.getElementById("event-modal");
+    const closeBtn = document.querySelector(".modal-close");
+    
+    if (closeBtn) {
+      closeBtn.addEventListener("click", closeEventModal);
+    }
+    
+    if (modal) {
+      modal.addEventListener("click", (e) => {
+        if (e.target === modal) {
+          closeEventModal();
+        }
+      });
+    }
+  } catch (err) {
+    console.error(err);
+  }
+}
+
+// --- Helper Functions --------------------------------------------------------
+
+function generateAutoDeadlineEvents(applications) {
+  const autoEvents = [];
+  
+  applications.forEach(app => {
+    if (app.deadline) {
+      autoEvents.push({
+        id: `auto-${app.id}`, // Virtual ID
+        title: `${app.company} - Application Deadline`,
+        subtitle: "",
+        date: app.deadline,
+        color: "red",
+        applicationId: app.id,
+        type: "application",
+        isAutoGenerated: true
+      });
+    }
+  });
+  
+  return autoEvents;
+}
+
+// --- Calendar page -----------------------------------------------------------
+
+async function initCalendarPage() {
+  const calendarRoot = document.querySelector("#calendar-root");
+  if (!calendarRoot) return;
+
+  let currentDate = new Date();
+  let currentView = "month";
+  let events = [];
+
+  try {
+    // Fetch both events and applications
+    const [calendarEvents, applications] = await Promise.all([
+      fetchJson("/api/apps/calendar"),
+      fetchJson("/api/apps")
+    ]);
+    
+    // Combine real events with auto-generated deadline events
+    const autoDeadlineEvents = generateAutoDeadlineEvents(applications);
+    events = [...calendarEvents, ...autoDeadlineEvents];
+  } catch (err) {
+    console.error("Failed to load events:", err);
+  }
+
+  // Setup event type selector listener
+  const eventTypeSelect = document.getElementById("event-type");
+  if (eventTypeSelect) {
+    eventTypeSelect.addEventListener("change", (e) => {
+      updateEventFormFields(e.target.value);
+    });
+  }
+
+  // Setup modal close handlers
+  const modal = document.getElementById("event-modal");
+  const closeBtn = document.querySelector(".modal-close");
+  
+  if (closeBtn) {
+    closeBtn.addEventListener("click", closeEventModal);
+  }
+  
+  if (modal) {
+    modal.addEventListener("click", (e) => {
+      if (e.target === modal) {
+        closeEventModal();
+      }
+    });
+  }
+
+  // View switching
+  const viewButtons = document.querySelectorAll("[data-view]");
+  viewButtons.forEach((btn) => {
+    btn.addEventListener("click", () => {
+      currentView = btn.dataset.view;
+      viewButtons.forEach((b) => b.classList.remove("active"));
+      btn.classList.add("active");
+      renderCalendar();
+    });
+  });
+
+  // Navigation buttons
+  document.getElementById("prev-btn")?.addEventListener("click", () => {
+    if (currentView === "month") {
+      currentDate.setMonth(currentDate.getMonth() - 1);
+    } else if (currentView === "week") {
+      currentDate.setDate(currentDate.getDate() - 7);
+    } else {
+      currentDate.setDate(currentDate.getDate() - 1);
+    }
+    renderCalendar();
+  });
+
+  document.getElementById("next-btn")?.addEventListener("click", () => {
+    if (currentView === "month") {
+      currentDate.setMonth(currentDate.getMonth() + 1);
+    } else if (currentView === "week") {
+      currentDate.setDate(currentDate.getDate() + 7);
+    } else {
+      currentDate.setDate(currentDate.getDate() + 1);
+    }
+    renderCalendar();
+  });
+
+  document.getElementById("today-btn")?.addEventListener("click", () => {
+    currentDate = new Date();
+    renderCalendar();
+  });
+
+  function renderCalendar() {
+    const monthView = document.getElementById("month-view");
+    const weekView = document.getElementById("week-view");
+    const dayView = document.getElementById("day-view");
+
+    // Hide all views
+    monthView.style.display = "none";
+    weekView.style.display = "none";
+    dayView.style.display = "none";
+
+    if (currentView === "month") {
+      monthView.style.display = "block";
+      renderMonthView();
+    } else if (currentView === "week") {
+      weekView.style.display = "block";
+      renderWeekView();
+    } else {
+      dayView.style.display = "block";
+      renderDayView();
+    }
+  }
+
+  function renderMonthView() {
+    const monthLabel = document.getElementById("calendar-month-label");
+    const tableBody = document.getElementById("calendar-tbody");
+
+    const year = currentDate.getFullYear();
+    const month = currentDate.getMonth();
+
+    const monthNames = ["January", "February", "March", "April", "May", "June", 
+                       "July", "August", "September", "October", "November", "December"];
+    
+    if (monthLabel) {
+      monthLabel.textContent = `${monthNames[month]} ${year}`;
+    }
+
+    const firstDay = new Date(year, month, 1);
+    const firstWeekday = firstDay.getDay();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const today = new Date();
+    const isCurrentMonth = today.getFullYear() === year && today.getMonth() === month;
+    const todayDate = today.getDate();
+
+    const cells = [];
+    for (let i = 0; i < firstWeekday; i++) {
+      cells.push(null);
+    }
+    for (let d = 1; d <= daysInMonth; d++) {
+      cells.push(d);
+    }
+    while (cells.length % 7 !== 0) {
+      cells.push(null);
+    }
+
+    if (tableBody) {
+      tableBody.innerHTML = "";
+      for (let row = 0; row < cells.length / 7; row++) {
+        const tr = document.createElement("tr");
+        for (let col = 0; col < 7; col++) {
+          const idx = row * 7 + col;
+          const dayNumber = cells[idx];
+          const td = document.createElement("td");
+          
+          if (dayNumber) {
+            const isToday = isCurrentMonth && dayNumber === todayDate;
+            
+            const daySpan = document.createElement("div");
+            daySpan.className = "calendar-day-number" + (isToday ? " today" : "");
+            daySpan.textContent = String(dayNumber);
+            td.appendChild(daySpan);
+
+            const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(dayNumber).padStart(2, "0")}`;
+            
+            events
+              .filter((e) => e.date === dateStr)
+              .forEach((e) => {
+                const div = document.createElement("div");
+                div.className = `calendar-event ${e.color || "blue"}`;
+                div.textContent = e.subtitle ? `${e.title} ${e.subtitle}` : e.title;
+                
+                // Only make clickable if not auto-generated
+                if (!e.isAutoGenerated) {
+                  div.style.cursor = "pointer";
+                  div.addEventListener("click", (evt) => {
+                    evt.stopPropagation();
+                    openEventModal(e.id);
+                  });
+                } else {
+                  div.style.opacity = "0.85";
+                  div.title = "Auto-generated from application deadline";
+                }
+                
+                td.appendChild(div);
+              });
+          }
+          
+          tr.appendChild(td);
+        }
+        tableBody.appendChild(tr);
+      }
+    }
+  }
+
+  function renderWeekView() {
+    const monthLabel = document.getElementById("calendar-month-label");
+    const weekDaysHeader = document.getElementById("week-days-header");
+    const weekTimeLabels = document.getElementById("week-time-labels");
+    const weekGrid = document.getElementById("week-grid");
+
+    // Get start of week (Sunday)
+    const startOfWeek = new Date(currentDate);
+    startOfWeek.setDate(currentDate.getDate() - currentDate.getDay());
+
+    const endOfWeek = new Date(startOfWeek);
+    endOfWeek.setDate(startOfWeek.getDate() + 6);
+
+    const monthNames = ["January", "February", "March", "April", "May", "June", 
+                       "July", "August", "September", "October", "November", "December"];
+    
+    if (monthLabel) {
+      const startMonth = monthNames[startOfWeek.getMonth()];
+      const endMonth = monthNames[endOfWeek.getMonth()];
+      const year = startOfWeek.getFullYear();
+      
+      if (startOfWeek.getMonth() === endOfWeek.getMonth()) {
+        monthLabel.textContent = `${startMonth} ${startOfWeek.getDate()}-${endOfWeek.getDate()}, ${year}`;
+      } else {
+        monthLabel.textContent = `${startMonth} ${startOfWeek.getDate()} - ${endMonth} ${endOfWeek.getDate()}, ${year}`;
+      }
+    }
+
+    // Render day headers
+    const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+    weekDaysHeader.innerHTML = "";
+    for (let i = 0; i < 7; i++) {
+      const date = new Date(startOfWeek);
+      date.setDate(startOfWeek.getDate() + i);
+      const isToday = isSameDay(date, new Date());
+      
+      const dayHeader = document.createElement("div");
+      dayHeader.className = "week-day-header" + (isToday ? " today" : "");
+      dayHeader.innerHTML = `
+        <div class="week-day-name">${dayNames[i]}</div>
+        <div class="week-day-number">${date.getDate()}</div>
+      `;
+      weekDaysHeader.appendChild(dayHeader);
+    }
+
+    // Render time labels (6 AM to 9 PM)
+    weekTimeLabels.innerHTML = "";
+    for (let hour = 6; hour <= 21; hour++) {
+      const label = document.createElement("div");
+      label.className = "time-label";
+      label.textContent = formatHour(hour);
+      weekTimeLabels.appendChild(label);
+    }
+
+    // Render grid
+    weekGrid.innerHTML = "";
+    const now = new Date();
+    
+    for (let i = 0; i < 7; i++) {
+      const date = new Date(startOfWeek);
+      date.setDate(startOfWeek.getDate() + i);
+      const column = document.createElement("div");
+      column.className = "week-day-column";
+      
+      // Add hour lines
+      for (let hour = 6; hour <= 21; hour++) {
+        const hourLine = document.createElement("div");
+        hourLine.className = "hour-line";
+        column.appendChild(hourLine);
+      }
+
+      // Add current time indicator if this is today
+      if (isSameDay(date, now)) {
+        const currentHour = now.getHours();
+        const currentMinute = now.getMinutes();
+        if (currentHour >= 6 && currentHour <= 21) {
+          const topPercent = ((currentHour - 6) * 60 + currentMinute) / (16 * 60) * 100;
+          const indicator = document.createElement("div");
+          indicator.className = "current-time-indicator";
+          indicator.style.top = `${topPercent}%`;
+          column.appendChild(indicator);
+        }
+      }
+
+      // Add events
+      const dateStr = formatDateString(date);
+      events
+        .filter((e) => e.date === dateStr)
+        .forEach((e) => {
+          const eventEl = document.createElement("div");
+          eventEl.className = `week-event ${e.color || "blue"}`;
+          eventEl.textContent = e.subtitle ? `${e.title} ${e.subtitle}` : e.title;
+          
+          // Only make clickable if not auto-generated
+          if (!e.isAutoGenerated) {
+            eventEl.style.cursor = "pointer";
+            eventEl.addEventListener("click", (evt) => {
+              evt.stopPropagation();
+              openEventModal(e.id);
+            });
+          } else {
+            eventEl.style.opacity = "0.85";
+            eventEl.title = "Auto-generated from application deadline";
+          }
+          
+          // Position at 9 AM by default
+          eventEl.style.top = "18.75%";
+          column.appendChild(eventEl);
+        });
+
+      weekGrid.appendChild(column);
+    }
+  }
+
+  function renderDayView() {
+    const monthLabel = document.getElementById("calendar-month-label");
+    const dayDateHeader = document.getElementById("day-date-header");
+    const dayTimeLabels = document.getElementById("day-time-labels");
+    const dayGrid = document.getElementById("day-grid");
+
+    const monthNames = ["January", "February", "March", "April", "May", "June", 
+                       "July", "August", "September", "October", "November", "December"];
+    const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+    
+    if (monthLabel) {
+      monthLabel.textContent = `${monthNames[currentDate.getMonth()]} ${currentDate.getFullYear()}`;
+    }
+
+    const isToday = isSameDay(currentDate, new Date());
+    
+    dayDateHeader.innerHTML = `
+      <div class="day-full-header ${isToday ? 'today' : ''}">
+        <div class="day-name">${dayNames[currentDate.getDay()]}</div>
+        <div class="day-number">${currentDate.getDate()}</div>
+      </div>
+    `;
+
+    // Render time labels
+    dayTimeLabels.innerHTML = "";
+    for (let hour = 0; hour < 24; hour++) {
+      const label = document.createElement("div");
+      label.className = "time-label";
+      label.textContent = formatHour(hour);
+      dayTimeLabels.appendChild(label);
+    }
+
+    // Render grid
+    dayGrid.innerHTML = "";
+    const column = document.createElement("div");
+    column.className = "day-column";
+    
+    // Add hour lines
+    for (let hour = 0; hour < 24; hour++) {
+      const hourLine = document.createElement("div");
+      hourLine.className = "hour-line";
+      column.appendChild(hourLine);
+    }
+
+    // Add current time indicator if this is today
+    const now = new Date();
+    if (isToday) {
+      const currentHour = now.getHours();
+      const currentMinute = now.getMinutes();
+      const topPercent = (currentHour * 60 + currentMinute) / (24 * 60) * 100;
+      const indicator = document.createElement("div");
+      indicator.className = "current-time-indicator";
+      indicator.style.top = `${topPercent}%`;
+      column.appendChild(indicator);
+    }
+
+    // Add events
+    const dateStr = formatDateString(currentDate);
+    events
+      .filter((e) => e.date === dateStr)
+      .forEach((e) => {
+        const eventEl = document.createElement("div");
+        eventEl.className = `day-event ${e.color || "blue"}`;
+        eventEl.textContent = e.subtitle ? `${e.title} ${e.subtitle}` : e.title;
+        
+        // Only make clickable if not auto-generated
+        if (!e.isAutoGenerated) {
+          eventEl.style.cursor = "pointer";
+          eventEl.addEventListener("click", (evt) => {
+            evt.stopPropagation();
+            openEventModal(e.id);
+          });
+        } else {
+          eventEl.style.opacity = "0.85";
+          eventEl.title = "Auto-generated from application deadline";
+        }
+        
+        // Position at 9 AM by default
+        eventEl.style.top = "37.5%";
+        column.appendChild(eventEl);
+      });
+
+    dayGrid.appendChild(column);
+  }
+
+  function isSameDay(date1, date2) {
+    return date1.getFullYear() === date2.getFullYear() &&
+           date1.getMonth() === date2.getMonth() &&
+           date1.getDate() === date2.getDate();
+  }
+
+  function formatDateString(date) {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  }
+
+  function formatHour(hour) {
+    if (hour === 0) return "12 AM";
+    if (hour < 12) return `${hour} AM`;
+    if (hour === 12) return "12 PM";
+    return `${hour - 12} PM`;
+  }
+
+  // Add Event button
+  document.getElementById("add-event-btn")?.addEventListener("click", () => {
+    openEventModal();
+  });
+
+  renderCalendar();
+}
+
+// --- Event Management Functions ---------------------------------------------
+
+async function openEventModalForApp(appId) {
+  await openEventModal(null, appId);
+}
+
+async function openEventModal(eventId = null, prefilledAppId = null) {
+  const modal = document.getElementById("event-modal");
+  if (!modal) return;
+
+  const isEdit = eventId !== null;
+  let event = null;
+
+  if (isEdit) {
+    try {
+      event = await fetchJson(`/api/events/${eventId}`);
+    } catch (err) {
+      console.error("Failed to load event:", err);
+      alert("Failed to load event details");
+      return;
+    }
+  }
+
+  // Populate modal title
+  document.getElementById("event-modal-title").textContent = isEdit ? "Edit Event" : "Add Event";
+
+  // Populate form
+  const form = document.getElementById("event-form");
+  const eventTypeSelect = document.getElementById("event-type");
+  const eventTitle = document.getElementById("event-title");
+  const eventApplicationId = document.getElementById("event-application-id");
+  const eventNotes = document.getElementById("event-notes");
+  const eventColor = document.getElementById("event-color");
+
+  if (event) {
+    eventTypeSelect.value = event.type;
+    eventTitle.value = event.title || "";
+    eventApplicationId.value = event.applicationId || "";
+    eventNotes.value = event.notes || "";
+    eventColor.value = event.color || "";
+    
+    // Populate type-specific fields
+    if (event.type === "application") {
+      document.getElementById("event-deadline").value = event.deadline || "";
+    } else if (event.type === "interview") {
+      document.getElementById("event-start-date").value = event.startDate || "";
+      document.getElementById("event-end-date").value = event.endDate || "";
+      document.getElementById("event-start-time").value = event.startTime || "";
+      document.getElementById("event-end-time").value = event.endTime || "";
+      document.getElementById("event-location").value = event.location || "";
+      document.getElementById("event-meeting-link").value = event.meetingLink || "";
+    } else if (event.type === "assignment") {
+      document.getElementById("event-assignment-deadline").value = event.deadline || "";
+    }
+  } else {
+    form.reset();
+    eventTypeSelect.value = "application";
+    if (prefilledAppId) {
+      eventApplicationId.value = prefilledAppId;
+    }
+  }
+
+  // Show/hide fields based on event type
+  updateEventFormFields(eventTypeSelect.value);
+
+  // Handle form submission
+  const submitBtn = document.getElementById("event-submit-btn");
+  const newSubmitBtn = submitBtn.cloneNode(true);
+  submitBtn.parentNode.replaceChild(newSubmitBtn, submitBtn);
+
+  newSubmitBtn.addEventListener("click", async (e) => {
+    e.preventDefault();
+    await saveEvent(eventId);
+  });
+
+  // Handle delete button
+  const deleteBtn = document.getElementById("event-delete-btn");
+  if (isEdit) {
+    deleteBtn.style.display = "block";
+    const newDeleteBtn = deleteBtn.cloneNode(true);
+    deleteBtn.parentNode.replaceChild(newDeleteBtn, deleteBtn);
+    
+    newDeleteBtn.addEventListener("click", async (e) => {
+      e.preventDefault();
+      if (confirm("Are you sure you want to delete this event?")) {
+        await deleteEvent(eventId);
+      }
+    });
+  } else {
+    deleteBtn.style.display = "none";
+  }
+
+  modal.style.display = "flex";
+}
+
+function updateEventFormFields(eventType) {
+  const applicationFields = document.getElementById("application-fields");
+  const interviewFields = document.getElementById("interview-fields");
+  const assignmentFields = document.getElementById("assignment-fields");
+
+  applicationFields.style.display = eventType === "application" ? "block" : "none";
+  interviewFields.style.display = eventType === "interview" ? "block" : "none";
+  assignmentFields.style.display = eventType === "assignment" ? "block" : "none";
+}
+
+async function saveEvent(eventId) {
+  const eventType = document.getElementById("event-type").value;
+  const eventTitle = document.getElementById("event-title").value;
+  const eventApplicationId = document.getElementById("event-application-id").value;
+  const eventNotes = document.getElementById("event-notes").value;
+  const eventColor = document.getElementById("event-color").value;
+
+  if (!eventTitle) {
+    alert("Please enter an event title");
+    return;
+  }
+
+  const payload = {
+    type: eventType,
+    title: eventTitle,
+    applicationId: eventApplicationId ? parseInt(eventApplicationId) : null,
+    notes: eventNotes,
+    color: eventColor,
+  };
+
+  // Add type-specific fields
+  if (eventType === "application") {
+    const deadline = document.getElementById("event-deadline").value;
+    if (!deadline) {
+      alert("Please enter a deadline");
+      return;
+    }
+    payload.deadline = deadline;
+  } else if (eventType === "interview") {
+    const startDate = document.getElementById("event-start-date").value;
+    if (!startDate) {
+      alert("Please enter a start date");
+      return;
+    }
+    payload.startDate = startDate;
+    payload.endDate = document.getElementById("event-end-date").value || startDate;
+    payload.startTime = document.getElementById("event-start-time").value;
+    payload.endTime = document.getElementById("event-end-time").value;
+    payload.location = document.getElementById("event-location").value;
+    payload.meetingLink = document.getElementById("event-meeting-link").value;
+  } else if (eventType === "assignment") {
+    const deadline = document.getElementById("event-assignment-deadline").value;
+    if (!deadline) {
+      alert("Please enter a deadline");
+      return;
+    }
+    payload.deadline = deadline;
+  }
+
+  try {
+    if (eventId) {
+      await fetchJson(`/api/events/${eventId}`, {
+        method: "PUT",
+        body: JSON.stringify(payload),
+      });
+    } else {
+      await fetchJson("/api/events", {
+        method: "POST",
+        body: JSON.stringify(payload),
+      });
+    }
+    closeEventModal();
+    // Reload page to refresh events and status (auto-updated on backend)
+    window.location.reload();
+  } catch (err) {
+    console.error("Failed to save event:", err);
+    alert("Failed to save event. Please try again.");
+  }
+}
+
+async function deleteEvent(eventId) {
+  try {
+    await fetchJson(`/api/events/${eventId}`, {
+      method: "DELETE",
+    });
+    closeEventModal();
+    // Reload page to refresh events and status (auto-updated on backend)
+    window.location.reload();
+  } catch (err) {
+    console.error("Failed to delete event:", err);
+    alert("Failed to delete event. Please try again.");
+  }
+}
+
+function closeEventModal() {
+  const modal = document.getElementById("event-modal");
+  if (modal) {
+    modal.style.display = "none";
+  }
+}
+
+// --- New application page ----------------------------------------------------
+
+async function initNewApplicationPage() {
+  const form = document.querySelector("#new-application-form");
+  if (!form) return;
+
+  const saveBtn = form.querySelector("button[type=submit]");
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    if (!saveBtn) return;
+    saveBtn.disabled = true;
+
+    const formData = new FormData(form);
+    const payload = {
+      company: formData.get("company") || "",
+      title: formData.get("title") || "",
+      location: formData.get("location") || "",
+      jobType: formData.get("jobType") || "Full-time",
+      jobLink: formData.get("jobLink") || "",
+      deadline: formData.get("deadline") || null,
+      salaryRange: formData.get("salaryRange") || "",
+      status: formData.get("status") || "Applied",
+      notes: formData.get("notes") || "",
+    };
+
+    if (!payload.company || !payload.title) {
+      alert("Please fill in required fields: Company Name and Job Title.");
+      saveBtn.disabled = false;
+      return;
+    }
+
+    try {
+      await fetchJson("/api/apps", {
+        method: "POST",
+        body: JSON.stringify(payload),
+      });
+      window.location.href = "index.html";
+    } catch (err) {
+      console.error(err);
+      alert("Could not save application. Please try again.");
+      saveBtn.disabled = false;
+    }
+  });
+}
+
+// --- Dashboard page ----------------------------------------------------------
+
+async function initDashboardPage() {
+  const dashboardRoot = document.querySelector("#dashboard-root");
+  if (!dashboardRoot) return;
+
+  try {
+    // Fetch summary metrics
+    const summary = await fetchJson("/api/dashboard-summary");
+    const totalEl = document.querySelector("#metric-total");
+    const interviewingEl = document.querySelector("#metric-interview");
+    const offersEl = document.querySelector("#metric-offers");
+
+    if (totalEl) totalEl.textContent = summary.totalApplications ?? 0;
+    if (interviewingEl)
+      interviewingEl.textContent = (summary.byStatus || {})["Pending Interview / Assignment"] ?? 0;
+    if (offersEl)
+      offersEl.textContent = (summary.byStatus || {})["Offered"] ?? 0;
+
+    // Fetch both events and applications
+    const [calendarEvents, applications] = await Promise.all([
+      fetchJson("/api/apps/calendar"),
+      fetchJson("/api/apps")
+    ]);
+    
+    // Combine real events with auto-generated deadline events
+    const autoDeadlineEvents = generateAutoDeadlineEvents(applications);
+    const allEvents = [...calendarEvents, ...autoDeadlineEvents];
+    
+    renderUpcomingEvents(allEvents);
+  } catch (err) {
+    console.error(err);
+  }
+}
+
+function renderUpcomingEvents(events) {
+  const upcomingList = document.getElementById("upcoming-events-list");
+  if (!upcomingList) return;
+
+  const now = new Date();
+  now.setHours(0, 0, 0, 0); // Start of today
+
+  // Filter future events and sort by date
+  const upcomingEvents = events
+    .filter((event) => {
+      const eventDate = new Date(event.date);
+      return eventDate >= now;
+    })
+    .sort((a, b) => new Date(a.date) - new Date(b.date))
+    .slice(0, 3); // Get next 3 events
+
+  if (upcomingEvents.length === 0) {
+    upcomingList.innerHTML = `
+      <div class="no-upcoming-events">
+        <p>No upcoming events scheduled</p>
+      </div>
+    `;
+    return;
+  }
+
+  upcomingList.innerHTML = "";
+  upcomingEvents.forEach((event) => {
+    const eventDate = new Date(event.date);
+    const isToday = isSameDay(eventDate, new Date());
+    const daysUntil = Math.ceil((eventDate - now) / (1000 * 60 * 60 * 24));
+
+    const eventCard = document.createElement("div");
+    eventCard.className = `upcoming-event-card ${event.color || "blue"}`;
+    
+    let timeLabel = "";
+    if (isToday) {
+      timeLabel = "Today";
+    } else if (daysUntil === 1) {
+      timeLabel = "Tomorrow";
+    } else if (daysUntil <= 7) {
+      timeLabel = `In ${daysUntil} days`;
+    } else {
+      timeLabel = formatUpcomingDate(eventDate);
+    }
+
+    eventCard.innerHTML = `
+      <div class="upcoming-event-indicator ${event.color || "blue"}"></div>
+      <div class="upcoming-event-content">
+        <div class="upcoming-event-title">${event.title}</div>
+        <div class="upcoming-event-meta">
+          ${event.subtitle ? `<span class="upcoming-event-time">${event.subtitle}</span>` : ""}
+          <span class="upcoming-event-date">${timeLabel} · ${formatUpcomingDate(eventDate)}</span>
+        </div>
+      </div>
+      <div class="upcoming-event-icon">
+        ${getEventIcon(event.color)}
+      </div>
+    `;
+    
+    // Make card clickable to navigate to calendar
+    eventCard.addEventListener("click", () => {
+      window.location.href = "calendar.html";
+    });
+    
+    upcomingList.appendChild(eventCard);
+  });
+}
+
+function isSameDay(date1, date2) {
+  return date1.getFullYear() === date2.getFullYear() &&
+         date1.getMonth() === date2.getMonth() &&
+         date1.getDate() === date2.getDate();
+}
+
+function formatUpcomingDate(date) {
+  const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", 
+                     "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  return `${dayNames[date.getDay()]}, ${monthNames[date.getMonth()]} ${date.getDate()}`;
+}
+
+function getEventIcon(color) {
+  const icons = {
+    blue: `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>`,
+    green: `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>`,
+    red: `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>`,
+    orange: `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>`,
+    purple: `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>`,
+  };
+  return icons[color] || icons.blue;
+}
+
+// --- Helpers -----------------------------------------------------------------
+
+function renderStatusTag(status) {
+  const map = {
+    "Pending Apply": "tag-pending",
+    "Under Review": "tag-reviewing",
+    "Pending Interview / Assignment": "tag-interview",
+    "Offered": "tag-offer",
+    "Rejected": "tag-rejected",
+    // Legacy statuses for backward compatibility
+    Interview: "tag-interview",
+    Applied: "tag-applied",
+    Reviewing: "tag-reviewing",
+  };
+  const cls = map[status] || "tag-reviewing";
+  return `<span class="status-chip ${cls}">${status}</span>`;
+}
+
+function renderStatusDropdown(currentStatus, appId) {
+  const statuses = [
+    "Pending Apply",
+    "Under Review",
+    "Pending Interview / Assignment",
+    "Offered",
+    "Rejected"
+  ];
+  
+  const options = statuses.map(status => 
+    `<option value="${status}" ${status === currentStatus ? 'selected' : ''}>${status}</option>`
+  ).join('');
+  
+  return `
+    <select class="status-dropdown" data-app-id="${appId}">
+      ${options}
+    </select>
+  `;
+}
+
+function formatShortDate(iso) {
+  if (!iso) return "-";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  return `${monthNames[d.getMonth()]} ${String(d.getDate()).padStart(2, "0")}`;
+}
+
+function formatLongDate(iso) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  const monthNames = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+  return `${monthNames[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`;
+}
+
+// --- Bootstrapping -----------------------------------------------------------
+
+document.addEventListener("DOMContentLoaded", () => {
+  initApplicationsPage();
+  initDetailPage();
+  initCalendarPage();
+  initNewApplicationPage();
+  initDashboardPage();
+});
+
+

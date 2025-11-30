@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>JobTracker – New Application</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar">
+        <div class="sidebar-logo">JobTracker</div>
+        <p class="nav-section-title">Menu</p>
+        <ul class="nav-list">
+          <li class="nav-item">
+            <a href="dashboard.html" class="nav-link">
+              <span class="icon icon-dashboard"></span>
+              Dashboard
+            </a>
+          </li>
+          <li class="nav-item">
+            <a href="index.html" class="nav-link active">
+              <span class="icon icon-applications"></span>
+              Applications
+            </a>
+          </li>
+          <li class="nav-item">
+            <a href="calendar.html" class="nav-link">
+              <span class="icon icon-calendar"></span>
+              Calendar View
+            </a>
+          </li>
+          <li class="nav-item">
+            <a href="integrations.html" class="nav-link">
+              <span class="icon icon-integrations"></span>
+              Integrations
+            </a>
+          </li>
+          <li class="nav-item">
+            <a href="settings.html" class="nav-link">
+              <span class="icon icon-settings"></span>
+              Settings
+            </a>
+          </li>
+        </ul>
+      </aside>
+
+      <div class="main-area">
+        <header class="top-bar">
+          <div class="top-bar-right">
+            <span>Logout</span>
+            <div class="avatar">JD</div>
+          </div>
+        </header>
+
+        <main class="content">
+          <a href="index.html" class="back-link">&larr; Back to Applications</a>
+
+          <section class="card">
+            <div class="page-header" style="margin-bottom: 18px;">
+              <div class="page-title-group">
+                <h1>Create New Application</h1>
+                <p>Fill in the details for your job application</p>
+              </div>
+            </div>
+
+            <form id="new-application-form">
+              <div class="form-grid">
+                <div class="form-field">
+                  <label for="company">Company Name *</label>
+                  <input
+                    type="text"
+                    id="company"
+                    name="company"
+                    placeholder="e.g., Google, Microsoft, Amazon"
+                    required
+                  />
+                </div>
+
+                <div class="form-field">
+                  <label for="title">Job Title *</label>
+                  <input
+                    type="text"
+                    id="title"
+                    name="title"
+                    placeholder="e.g., Software Engineer, Product Manager"
+                    required
+                  />
+                </div>
+
+                <div class="form-field">
+                  <label for="location">Location</label>
+                  <input
+                    type="text"
+                    id="location"
+                    name="location"
+                    placeholder="e.g., San Francisco, CA"
+                  />
+                </div>
+
+                <div class="form-field">
+                  <label for="jobType">Job Type</label>
+                  <select id="jobType" name="jobType">
+                    <option value="Full-time">Full-time</option>
+                    <option value="Part-time">Part-time</option>
+                    <option value="Internship">Internship</option>
+                    <option value="Contract">Contract</option>
+                  </select>
+                </div>
+
+                <div class="form-field">
+                  <label for="jobLink">Job Link</label>
+                  <input
+                    type="url"
+                    id="jobLink"
+                    name="jobLink"
+                    placeholder="https://careers.company.com/jobs/..."
+                  />
+                </div>
+
+                <div class="form-field">
+                  <label for="deadline">Application Deadline</label>
+                  <input type="date" id="deadline" name="deadline" />
+                </div>
+
+                <div class="form-field">
+                  <label for="salaryRange">Salary Range</label>
+                  <input
+                    type="text"
+                    id="salaryRange"
+                    name="salaryRange"
+                    placeholder="$80k - $120k"
+                  />
+                </div>
+
+                <div class="form-field">
+                  <label for="status">Status *</label>
+                  <select id="status" name="status">
+                    <option value="Pending Apply">Pending Apply</option>
+                    <option value="Under Review">Under Review</option>
+                    <option value="Pending Interview / Assignment">Pending Interview / Assignment</option>
+                    <option value="Offered">Offered</option>
+                    <option value="Rejected">Rejected</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="form-field" style="margin-top: 16px;">
+                <label for="notes">Notes</label>
+                <textarea
+                  id="notes"
+                  name="notes"
+                  placeholder="Add any additional notes, contacts, or important information..."
+                ></textarea>
+              </div>
+
+              <div class="form-footer">
+                <button
+                  type="button"
+                  class="primary-btn secondary"
+                  onclick="window.location.href='index.html'"
+                >
+                  Cancel
+                </button>
+                <button type="submit" class="primary-btn">Save Application</button>
+              </div>
+            </form>
+          </section>
+        </main>
+      </div>
+    </div>
+
+    <script src="app.js"></script>
+  </body>
+</html>
+
+
