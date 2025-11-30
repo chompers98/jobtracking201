@@ -1,6 +1,6 @@
 ## JobTracker Mock Application
 
-This project is a lightweight implementation of the **JobTracker** UI shown in the provided screenshots.  
+This project is a lightweight implementation of the **JobTracker** UI.  
 It uses:
 
 - **Front end**: static HTML/CSS/JavaScript in the `web` folder (no framework)
@@ -42,7 +42,7 @@ Then visit `http://localhost:8000/index.html`.
 - **Dashboard (`dashboard.html`)**: small summary cards powered by `/api/dashboard-summary`.
 - **Applications (`index.html`)**: table of applications with client-side search and filters; rows link to details.
 - **Application Detail (`application_detail.html`)**: job details, timeline, notes, and documents using `/api/apps/:id`.
-- **Calendar (`calendar.html`)**: calendar rendering events from `/api/apps/calendar`.
+- **Calendar (`calendar.html`)**: calendar rendering reminders from `/api/apps/calendar`.
 - **Create New Application (`new_application.html`)**: form that POSTs to `/api/apps` and then redirects back to the list.
 - **Integrations (`integrations.html`)**: manage Google and OpenAI integrations.
 - **Settings (`settings.html`)**: user profile and settings.
@@ -65,15 +65,19 @@ Base URL: `http://localhost:5000`
   "id": 1,
   "company": "Google",
   "title": "Software Engineer",
-  "status": "Pending Interview / Assignment",
-  "deadline": "2025-11-15",
+  "status": "INTERVIEW",
+  "deadline_at": "2025-11-15",
+  "interview_at": "2025-11-15T14:00:00",
   "location": "Mountain View, CA",
-  "jobType": "Full-time",
-  "salaryRange": "$120k - $180k",
-  "jobLink": "https://careers.google.com/jobs/12345",
+  "job_type": "Full-time",
+  "salary": "$120k - $180k",
+  "job_link": "https://careers.google.com/jobs/12345",
+  "links": {
+    "job_post": "https://careers.google.com/jobs/12345"
+  },
   "experience": "3-5 years",
-  "createdAt": "2025-10-25",
-  "appliedAt": "2025-10-28",
+  "created_at": "2025-10-25",
+  "applied_at": "2025-10-28",
   "documents": [
     {
       "label": "Resume_2025.pdf",
@@ -85,68 +89,70 @@ Base URL: `http://localhost:5000`
 ```
 
 **Valid Status Values:**
-- `"Pending Apply"`
-- `"Under Review"`
-- `"Pending Interview / Assignment"`
-- `"Offered"`
-- `"Rejected"`
+- `"DRAFT"`
+- `"APPLIED"`
+- `"INTERVIEW"`
+- `"OFFER"`
+- `"REJECTED"`
 
-#### Event Object
+#### Reminder Object (formerly Event)
 
-Events can be one of three types: `application`, `interview`, or `assignment`.
+Reminders can be one of three kinds: `DEADLINE`, `INTERVIEW`, or `FOLLOWUP`.
 
-**Common Fields (all event types):**
+**Common Fields (all reminder types):**
 ```json
 {
   "id": 1,
-  "type": "interview",
+  "kind": "INTERVIEW",
   "title": "Google Interview",
-  "applicationId": 1,
+  "application_id": 1,
   "notes": "Technical interview round 2",
   "color": "green",
-  "createdAt": "2025-10-28"
+  "created_at": "2025-10-28",
+  "trigger_at": "2025-11-15",
+  "sent_at": null
 }
 ```
 
 **Type-Specific Fields:**
 
-*Application event (deadline-based):*
+*Deadline reminder (deadline-based):*
 ```json
 {
-  "type": "application",
-  "deadline": "2025-11-20"
+  "kind": "DEADLINE",
+  "trigger_at": "2025-11-20"
 }
 ```
 
-*Interview event (date/time-based):*
+*Interview reminder (date/time-based):*
 ```json
 {
-  "type": "interview",
-  "startDate": "2025-11-15",
-  "endDate": "2025-11-15",
-  "startTime": "14:00",
-  "endTime": "15:00",
+  "kind": "INTERVIEW",
+  "trigger_at": "2025-11-15",
+  "end_date": "2025-11-15",
+  "start_time": "14:00",
+  "end_time": "15:00",
   "location": "Mountain View Office",
-  "meetingLink": "https://meet.google.com/abc-defg-hij"
+  "meeting_link": "https://meet.google.com/abc-defg-hij"
 }
 ```
 
-*Assignment event (deadline-based):*
+*Follow-up reminder:*
 ```json
 {
-  "type": "assignment",
-  "deadline": "2025-11-22"
+  "kind": "FOLLOWUP",
+  "trigger_at": "2025-11-22"
 }
 ```
 
-**Valid Event Types:**
-- `"application"` - color default: `red`
-- `"interview"` - color default: `green`
-- `"assignment"` - color default: `orange`
+**Valid Reminder Kinds:**
+- `"DEADLINE"` - color default: `red`
+- `"INTERVIEW"` - color default: `green`
+- `"FOLLOWUP"` - color default: `orange`
 
-#### Calendar Event Object
+#### Calendar Reminder Object
 
-Simplified event format for calendar display:
+Simplified format for calendar display:
 
 ```json
 {
@@ -155,8 +161,8 @@ Simplified event format for calendar display:
   "subtitle": "14:00 - 15:00",
   "date": "2025-11-15",
   "color": "green",
-  "applicationId": 1,
-  "type": "interview"
+  "application_id": 1,
+  "kind": "INTERVIEW"
 }
 ```
 
@@ -170,7 +176,10 @@ Simplified event format for calendar display:
     "clientId": "",
     "clientSecret": "",
     "gmailEnabled": true,
-    "calendarEnabled": true
+    "calendarEnabled": true,
+    "access_token": "",
+    "refresh_token": "",
+    "expires_at": ""
   },
   "openai": {
     "enabled": false,
@@ -186,7 +195,8 @@ Simplified event format for calendar display:
 {
   "id": 1,
   "email": "user@example.com",
-  "username": "John Doe"
+  "username": "John Doe",
+  "role": "USER"
 }
 ```
 
@@ -223,14 +233,14 @@ Create a new application.
 {
   "company": "Google",          // required
   "title": "Software Engineer", // required
-  "status": "Pending Apply",    // optional, defaults to "Pending Apply"
-  "deadline": "2025-11-15",     // optional
+  "status": "APPLIED",          // optional, defaults to "DRAFT"
+  "deadline_at": "2025-11-15",  // optional
   "location": "Mountain View, CA",
-  "jobType": "Full-time",       // optional, defaults to "Full-time"
-  "salaryRange": "$120k - $180k",
-  "jobLink": "https://...",
+  "job_type": "Full-time",      // optional, defaults to "Full-time"
+  "salary": "$120k - $180k",
+  "job_link": "https://...",
   "experience": "3-5 years",
-  "appliedAt": "2025-10-28",    // optional, defaults to today
+  "applied_at": "2025-10-28",   // optional, defaults to today
   "documents": [],              // optional, defaults to []
   "notes": ""                   // optional, defaults to ""
 }
@@ -242,7 +252,7 @@ Create a new application.
   "id": 4,
   "company": "Google",
   ...
-  "createdAt": "2025-11-30"
+  "created_at": "2025-11-30"
 }
 ```
 
@@ -276,12 +286,12 @@ Update an application. Supports partial updates.
 {
   "company": "Google Inc.",
   "title": "Senior Software Engineer",
-  "status": "Offered",
-  "deadline": "2025-12-01",
+  "status": "OFFER",
+  "deadline_at": "2025-12-01",
   "location": "San Francisco, CA",
-  "jobType": "Full-time",
-  "salaryRange": "$150k - $200k",
-  "jobLink": "https://...",
+  "job_type": "Full-time",
+  "salary": "$150k - $200k",
+  "links": { "job_post": "https://..." },
   "experience": "5+ years",
   "documents": [...],
   "notes": "Updated notes"
@@ -308,7 +318,7 @@ Update only the status of an application.
 **Request Body:**
 ```json
 {
-  "status": "Offered"
+  "status": "OFFER"
 }
 ```
 
@@ -316,7 +326,7 @@ Update only the status of an application.
 ```json
 {
   "id": 1,
-  "status": "Offered",
+  "status": "OFFER",
   ...
 }
 ```
@@ -327,18 +337,18 @@ Update only the status of an application.
 
 ---
 
-##### `GET /api/apps/:id/events`
+##### `GET /api/apps/:id/reminders`
 
-Get all events for a specific application.
+Get all reminders for a specific application.
 
 **Response:** `200 OK`
 ```json
 [
   {
     "id": 1,
-    "type": "interview",
+    "kind": "INTERVIEW",
     "title": "Google Interview",
-    "applicationId": 1,
+    "application_id": 1,
     ...
   }
 ]
@@ -348,7 +358,7 @@ Get all events for a specific application.
 
 ##### `GET /api/apps/calendar`
 
-Get all events formatted for calendar display.
+Get all reminders formatted for calendar display.
 
 **Response:** `200 OK`
 ```json
@@ -359,26 +369,26 @@ Get all events formatted for calendar display.
     "subtitle": "14:00 - 15:00",
     "date": "2025-11-15",
     "color": "green",
-    "applicationId": 1,
-    "type": "interview"
+    "application_id": 1,
+    "kind": "INTERVIEW"
   }
 ]
 ```
 
 ---
 
-#### Events
+#### Reminders (formerly Events)
 
-##### `GET /api/events`
+##### `GET /api/reminders`
 
-Get all events.
+Get all reminders.
 
 **Response:** `200 OK`
 ```json
 [
   {
     "id": 1,
-    "type": "interview",
+    "kind": "INTERVIEW",
     "title": "Google Interview",
     ...
   }
@@ -387,48 +397,36 @@ Get all events.
 
 ---
 
-##### `POST /api/events`
+##### `POST /api/reminders`
 
-Create a new event. Automatically updates the linked application's status.
+Create a new reminder. Automatically updates the linked application's status.
 
-**Request Body (Application event):**
+**Request Body (Deadline reminder):**
 ```json
 {
-  "type": "application",        // required
+  "kind": "DEADLINE",           // required
   "title": "Application Deadline", // optional
-  "applicationId": 1,           // optional
-  "deadline": "2025-11-20",     // required for application events
+  "application_id": 1,          // optional
+  "trigger_at": "2025-11-20",   // required
   "notes": "",                  // optional
-  "color": "red"                // optional, defaults based on type
+  "color": "red"                // optional, defaults based on kind
 }
 ```
 
-**Request Body (Interview event):**
+**Request Body (Interview reminder):**
 ```json
 {
-  "type": "interview",
+  "kind": "INTERVIEW",
   "title": "Technical Interview",
-  "applicationId": 1,
-  "startDate": "2025-11-15",    // required for interview events
-  "endDate": "2025-11-15",      // optional, defaults to startDate
-  "startTime": "14:00",         // optional
-  "endTime": "15:00",           // optional
+  "application_id": 1,
+  "trigger_at": "2025-11-15",   // required
+  "end_date": "2025-11-15",     // optional
+  "start_time": "14:00",        // optional
+  "end_time": "15:00",          // optional
   "location": "Office",         // optional
-  "meetingLink": "https://...", // optional
+  "meeting_link": "https://...", // optional
   "notes": "",
   "color": "green"
-}
-```
-
-**Request Body (Assignment event):**
-```json
-{
-  "type": "assignment",
-  "title": "Take-home Assignment",
-  "applicationId": 1,
-  "deadline": "2025-11-22",     // required for assignment events
-  "notes": "",
-  "color": "orange"
 }
 ```
 
@@ -436,48 +434,47 @@ Create a new event. Automatically updates the linked application's status.
 ```json
 {
   "id": 3,
-  "type": "interview",
+  "kind": "INTERVIEW",
   ...
-  "createdAt": "2025-11-30"
+  "created_at": "2025-11-30"
 }
 ```
 
 **Error:** 
-- `400 Bad Request` if type is invalid or required fields are missing
+- `400 Bad Request` if kind is invalid or required fields are missing
 
 ---
 
-##### `GET /api/events/:id`
+##### `GET /api/reminders/:id`
 
-Get a specific event by ID.
+Get a specific reminder by ID.
 
 **Response:** `200 OK`
 ```json
 {
   "id": 1,
-  "type": "interview",
+  "kind": "INTERVIEW",
   ...
 }
 ```
 
-**Error:** `404 Not Found` if event doesn't exist.
+**Error:** `404 Not Found` if reminder doesn't exist.
 
 ---
 
-##### `PUT /api/events/:id`
+##### `PUT /api/reminders/:id`
 
-Update an event. Supports partial updates. Automatically updates the linked application's status.
+Update a reminder. Supports partial updates. Automatically updates the linked application's status.
 
 **Request Body:**
 ```json
 {
   "title": "Updated Title",
-  "applicationId": 2,
+  "application_id": 2,
   "notes": "Updated notes",
   "color": "blue",
-  // Include type-specific fields as needed
-  "startDate": "2025-11-16",
-  "startTime": "15:00"
+  "trigger_at": "2025-11-16",
+  "start_time": "15:00"
 }
 ```
 
@@ -490,23 +487,23 @@ Update an event. Supports partial updates. Automatically updates the linked appl
 }
 ```
 
-**Error:** `404 Not Found` if event doesn't exist.
+**Error:** `404 Not Found` if reminder doesn't exist.
 
 ---
 
-##### `DELETE /api/events/:id`
+##### `DELETE /api/reminders/:id`
 
-Delete an event. Automatically updates the linked application's status.
+Delete a reminder. Automatically updates the linked application's status.
 
 **Response:** `200 OK`
 ```json
 {
   "success": true,
-  "message": "Event deleted"
+  "message": "Reminder deleted"
 }
 ```
 
-**Error:** `404 Not Found` if event doesn't exist.
+**Error:** `404 Not Found` if reminder doesn't exist.
 
 ---
 
@@ -521,11 +518,11 @@ Get summary statistics for the dashboard.
 {
   "totalApplications": 3,
   "byStatus": {
-    "Pending Apply": 1,
-    "Under Review": 1,
-    "Pending Interview / Assignment": 1,
-    "Offered": 0,
-    "Rejected": 0
+    "DRAFT": 1,
+    "APPLIED": 1,
+    "INTERVIEW": 1,
+    "OFFER": 0,
+    "REJECTED": 0
   }
 }
 ```
@@ -543,7 +540,8 @@ Get current user profile.
 {
   "id": 1,
   "email": "user@example.com",
-  "username": "John Doe"
+  "username": "John Doe",
+  "role": "USER"
 }
 ```
 
@@ -727,17 +725,17 @@ Reset OpenAI integration to defaults (disabled, empty fields).
 
 ### Auto-Status Updates
 
-The backend automatically updates application statuses based on events:
+The backend automatically updates application statuses based on reminders:
 
-1. **No events**: Status set to `"Pending Apply"` (if not applied) or `"Under Review"` (if applied)
-2. **Interview/Assignment events exist**: Status set to `"Pending Interview / Assignment"`
-3. **Offer keywords detected** (in event title/notes): Status set to `"Offered"`
-4. **Rejection keywords detected** (in event title/notes): Status set to `"Rejected"`
+1. **No reminders**: Status set to `"DRAFT"` (if not applied) or `"APPLIED"` (if applied)
+2. **Interview reminders exist**: Status set to `"INTERVIEW"`
+3. **Offer keywords detected** (in reminder title/notes): Status set to `"OFFER"`
+4. **Rejection keywords detected** (in reminder title/notes): Status set to `"REJECTED"`
 
 Auto-update triggers:
-- When creating a new event (`POST /api/events`)
-- When updating an event (`PUT /api/events/:id`)
-- When deleting an event (`DELETE /api/events/:id`)
+- When creating a new reminder (`POST /api/reminders`)
+- When updating a reminder (`PUT /api/reminders/:id`)
+- When deleting a reminder (`DELETE /api/reminders/:id`)
 
 ---
 
@@ -756,5 +754,3 @@ Error response format:
   "error": "Error message description"
 }
 ```
-
-

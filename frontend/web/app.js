@@ -11,6 +11,57 @@ async function fetchJson(path, options = {}) {
   return res.json();
 }
 
+// --- Status Helpers ----------------------------------------------------------
+
+const STATUS_LABELS = {
+  "DRAFT": "Pending Apply",
+  "APPLIED": "Under Review",
+  "INTERVIEW": "Pending Interview", // Shortened for UI or keep "Pending Interview / Assignment"? Schema is INTERVIEW.
+  "OFFER": "Offered",
+  "REJECTED": "Rejected"
+};
+
+// Also support reverse mapping for display consistency if needed, 
+// but primarily we map the API ENUMs to Display Labels.
+// "Pending Interview / Assignment" was the old label. I'll use "Interview" or similar.
+STATUS_LABELS["INTERVIEW"] = "Interview"; 
+
+function getStatusLabel(status) {
+  return STATUS_LABELS[status] || status;
+}
+
+function renderStatusTag(status) {
+  const map = {
+    "DRAFT": "tag-pending",
+    "APPLIED": "tag-reviewing",
+    "INTERVIEW": "tag-interview",
+    "OFFER": "tag-offer",
+    "REJECTED": "tag-rejected",
+  };
+  const cls = map[status] || "tag-reviewing";
+  return `<span class="status-chip ${cls}">${getStatusLabel(status)}</span>`;
+}
+
+function renderStatusDropdown(currentStatus, appId) {
+  const statuses = [
+    "DRAFT",
+    "APPLIED",
+    "INTERVIEW",
+    "OFFER",
+    "REJECTED"
+  ];
+  
+  const options = statuses.map(status => 
+    `<option value="${status}" ${status === currentStatus ? 'selected' : ''}>${getStatusLabel(status)}</option>`
+  ).join('');
+  
+  return `
+    <select class="status-dropdown" data-app-id="${appId}">
+      ${options}
+    </select>
+  `;
+}
+
 // --- Applications list page --------------------------------------------------
 
 async function initApplicationsPage() {
@@ -25,7 +76,7 @@ async function initApplicationsPage() {
   let currentFilter = "all";
 
   function statusIsActive(status) {
-    return status !== "Offered" && status !== "Rejected";
+    return status !== "OFFER" && status !== "REJECTED";
   }
 
   function applyFilterAndRender() {
@@ -52,7 +103,7 @@ async function initApplicationsPage() {
         <td>${app.company}</td>
         <td>${app.title}</td>
         <td class="status-cell">${renderStatusTag(app.status)}</td>
-        <td>${formatShortDate(app.deadline)}</td>
+        <td>${formatShortDate(app.deadline_at)}</td>
         <td class="link-cell"><a href="application_detail.html?id=${app.id}">View</a></td>
       `;
       tableBody.appendChild(tr);
@@ -94,7 +145,7 @@ async function initDetailPage() {
 
   try {
     const app = await fetchJson(`/api/apps/${id}`);
-    const appEvents = await fetchJson(`/api/apps/${id}/events`);
+    const appReminders = await fetchJson(`/api/apps/${id}/reminders`);
 
     const titleEl = document.querySelector("#detail-title");
     const companyEl = document.querySelector("#detail-company");
@@ -143,28 +194,36 @@ async function initDetailPage() {
         </div>
         <div>
           <dt>Job Type</dt>
-          <dd>${app.jobType || "-"}</dd>
+          <dd>${app.job_type || "-"}</dd>
         </div>
         <div>
           <dt>Application Date</dt>
-          <dd>${formatShortDate(app.appliedAt)}</dd>
+          <dd>${formatShortDate(app.applied_at)}</dd>
         </div>
         <div>
           <dt>Deadline</dt>
-          <dd>${formatShortDate(app.deadline)}</dd>
+          <dd>${formatShortDate(app.deadline_at)}</dd>
+        </div>
+        <div>
+          <dt>Interview Date</dt>
+          <dd>${formatShortDate(app.interview_at)}</dd>
         </div>
         <div>
           <dt>Salary Range</dt>
-          <dd>${app.salaryRange || "-"}</dd>
+          <dd>${app.salary || "-"}</dd>
         </div>
         <div>
           <dt>Experience</dt>
           <dd>${app.experience || "-"}</dd>
         </div>
         <div style="grid-column: 1 / -1;">
-          <dt>Job Link</dt>
-          <dd><a href="${app.jobLink || "#"}" target="_blank" rel="noreferrer">${app.jobLink ||
-        "-"}</a></dd>
+          <dt>Links</dt>
+          <dd>
+            ${(app.links && Object.keys(app.links).length > 0) 
+              ? Object.entries(app.links).map(([k, v]) => `<a href="${v}" target="_blank" rel="noreferrer" style="margin-right: 10px; text-transform: capitalize;">${k.replace('_', ' ')}</a>`).join('') 
+              : `<a href="${app.job_link || "#"}" target="_blank" rel="noreferrer">${app.job_link || "-"}</a>`
+            }
+          </dd>
         </div>
       `;
     }
@@ -172,17 +231,18 @@ async function initDetailPage() {
     if (timelineList) {
       timelineList.innerHTML = "";
       
-      // Combine actual events with auto-generated deadline event
-      const allTimelineItems = [...appEvents];
+      // Combine actual reminders with auto-generated deadline event
+      // Reminders have 'trigger_at'
+      const allTimelineItems = [...appReminders];
       
       // Auto-generate Application Deadline event if application has a deadline
-      if (app.deadline) {
+      if (app.deadline_at) {
         allTimelineItems.push({
           id: null, // Virtual event, no ID
-          type: "application",
+          kind: "DEADLINE", // Was application
           title: "Application Deadline",
-          deadline: app.deadline,
-          applicationId: app.id,
+          trigger_at: app.deadline_at,
+          application_id: app.id,
           notes: "",
           isAutoGenerated: true
         });
@@ -192,47 +252,49 @@ async function initDetailPage() {
       if (allTimelineItems.length > 0) {
         allTimelineItems
           .sort((a, b) => {
-            const dateA = a.deadline || a.startDate;
-            const dateB = b.deadline || b.startDate;
+            const dateA = a.trigger_at;
+            const dateB = b.trigger_at;
             return new Date(dateB) - new Date(dateA);
           })
-          .forEach((event, index) => {
-            const dotClass = event.type === "interview" ? "green" : event.type === "assignment" ? "orange" : "red";
+          .forEach((reminder, index) => {
+            // Map kind to color class
+            const dotClass = reminder.kind === "INTERVIEW" ? "green" : reminder.kind === "FOLLOWUP" ? "orange" : "red";
+            
             const item = document.createElement("div");
             item.className = "timeline-item";
             
             // Only make it clickable if it's not auto-generated
-            if (!event.isAutoGenerated) {
+            if (!reminder.isAutoGenerated) {
               item.style.cursor = "pointer";
             }
             
-            let eventDate = event.deadline || event.startDate;
+            let eventDate = reminder.trigger_at;
             let eventDescription = "";
             
-            if (event.type === "interview") {
-              eventDescription = event.location || event.meetingLink || "";
-              if (event.startTime) {
-                eventDescription = `${event.startTime}${event.endTime ? ' - ' + event.endTime : ''} · ${eventDescription}`;
+            if (reminder.kind === "INTERVIEW") {
+              eventDescription = reminder.location || reminder.meeting_link || "";
+              if (reminder.start_time) {
+                eventDescription = `${reminder.start_time}${reminder.end_time ? ' - ' + reminder.end_time : ''} · ${eventDescription}`;
               }
-            } else if (event.notes) {
-              eventDescription = event.notes;
+            } else if (reminder.notes) {
+              eventDescription = reminder.notes;
             }
             
             // Add auto-generated indicator
-            const titleSuffix = event.isAutoGenerated ? ' <span style="font-size: 0.75rem; color: #9ca3af;">(Auto)</span>' : '';
+            const titleSuffix = reminder.isAutoGenerated ? ' <span style="font-size: 0.75rem; color: #9ca3af;">(Auto)</span>' : '';
             
             item.innerHTML = `
               <div class="timeline-dot ${dotClass}"></div>
               <div>
-                <div class="timeline-content-title">${event.title}${titleSuffix}</div>
+                <div class="timeline-content-title">${reminder.title}${titleSuffix}</div>
                 <div class="timeline-content-meta">${formatLongDate(eventDate)}${eventDescription ? " · " + eventDescription : ""}</div>
               </div>
             `;
             
             // Only add click handler if not auto-generated
-            if (!event.isAutoGenerated) {
+            if (!reminder.isAutoGenerated) {
               item.addEventListener("click", () => {
-                openEventModal(event.id);
+                openEventModal(reminder.id);
               });
             }
             
@@ -242,14 +304,14 @@ async function initDetailPage() {
         // Show empty state when no events
         const emptyState = document.createElement("div");
         emptyState.className = "timeline-empty-state";
-        emptyState.innerHTML = `<p>No events yet. Click the button below to add your first event.</p>`;
+        emptyState.innerHTML = `<p>No reminders yet. Click the button below to add your first reminder.</p>`;
         timelineList.appendChild(emptyState);
       }
       
       // Add event button
       const addEventBtn = document.createElement("button");
       addEventBtn.className = "add-timeline-btn";
-      addEventBtn.textContent = "+ Add Event";
+      addEventBtn.textContent = "+ Add Reminder";
       addEventBtn.addEventListener("click", () => {
         openEventModalForApp(parseInt(id));
       });
@@ -309,15 +371,16 @@ function generateAutoDeadlineEvents(applications) {
   const autoEvents = [];
   
   applications.forEach(app => {
-    if (app.deadline) {
+    if (app.deadline_at) {
       autoEvents.push({
         id: `auto-${app.id}`, // Virtual ID
         title: `${app.company} - Application Deadline`,
         subtitle: "",
-        date: app.deadline,
+        date: app.deadline_at, // For calendar view
+        trigger_at: app.deadline_at, // For timeline view compatibility
         color: "red",
-        applicationId: app.id,
-        type: "application",
+        application_id: app.id,
+        kind: "DEADLINE",
         isAutoGenerated: true
       });
     }
@@ -345,6 +408,7 @@ async function initCalendarPage() {
     
     // Combine real events with auto-generated deadline events
     const autoDeadlineEvents = generateAutoDeadlineEvents(applications);
+    // The calendar endpoint returns objects with 'date' property already formatted for calendar
     events = [...calendarEvents, ...autoDeadlineEvents];
   } catch (err) {
     console.error("Failed to load events:", err);
@@ -758,16 +822,16 @@ async function openEventModal(eventId = null, prefilledAppId = null) {
 
   if (isEdit) {
     try {
-      event = await fetchJson(`/api/events/${eventId}`);
+      event = await fetchJson(`/api/reminders/${eventId}`);
     } catch (err) {
-      console.error("Failed to load event:", err);
-      alert("Failed to load event details");
+      console.error("Failed to load reminder:", err);
+      alert("Failed to load reminder details");
       return;
     }
   }
 
   // Populate modal title
-  document.getElementById("event-modal-title").textContent = isEdit ? "Edit Event" : "Add Event";
+  document.getElementById("event-modal-title").textContent = isEdit ? "Edit Reminder" : "Add Reminder";
 
   // Populate form
   const form = document.getElementById("event-form");
@@ -778,28 +842,36 @@ async function openEventModal(eventId = null, prefilledAppId = null) {
   const eventColor = document.getElementById("event-color");
 
   if (event) {
-    eventTypeSelect.value = event.type;
+    eventTypeSelect.value = event.kind;
     eventTitle.value = event.title || "";
-    eventApplicationId.value = event.applicationId || "";
+    eventApplicationId.value = event.application_id || "";
     eventNotes.value = event.notes || "";
     eventColor.value = event.color || "";
     
     // Populate type-specific fields
-    if (event.type === "application") {
-      document.getElementById("event-deadline").value = event.deadline || "";
-    } else if (event.type === "interview") {
-      document.getElementById("event-start-date").value = event.startDate || "";
-      document.getElementById("event-end-date").value = event.endDate || "";
-      document.getElementById("event-start-time").value = event.startTime || "";
-      document.getElementById("event-end-time").value = event.endTime || "";
+    if (event.kind === "DEADLINE") {
+      document.getElementById("event-deadline").value = event.trigger_at || "";
+    } else if (event.kind === "INTERVIEW") {
+      document.getElementById("event-start-date").value = event.trigger_at || "";
+      document.getElementById("event-end-date").value = event.end_date || "";
+      document.getElementById("event-start-time").value = event.start_time || "";
+      document.getElementById("event-end-time").value = event.end_time || "";
       document.getElementById("event-location").value = event.location || "";
-      document.getElementById("event-meeting-link").value = event.meetingLink || "";
-    } else if (event.type === "assignment") {
-      document.getElementById("event-assignment-deadline").value = event.deadline || "";
+      document.getElementById("event-meeting-link").value = event.meeting_link || "";
+    } else if (event.kind === "FOLLOWUP") {
+        // Use assignment-fields for followup for now, assuming similar structure
+        // But we need to check if assignment fields exist in DOM and if they fit
+        // The UI HTML likely has IDs like 'event-assignment-deadline'.
+        // Since we replaced 'assignment' with 'FOLLOWUP' or 'DEADLINE', 
+        // we need to map what the UI has to what we want.
+        // The HTML has <div id="assignment-fields">...</div> likely.
+        // We will map FOLLOWUP to use assignment fields if possible, or generic.
+        const assignmentDeadline = document.getElementById("event-assignment-deadline");
+        if (assignmentDeadline) assignmentDeadline.value = event.trigger_at || "";
     }
   } else {
     form.reset();
-    eventTypeSelect.value = "application";
+    eventTypeSelect.value = "DEADLINE"; // Default to DEADLINE
     if (prefilledAppId) {
       eventApplicationId.value = prefilledAppId;
     }
@@ -827,7 +899,7 @@ async function openEventModal(eventId = null, prefilledAppId = null) {
     
     newDeleteBtn.addEventListener("click", async (e) => {
       e.preventDefault();
-      if (confirm("Are you sure you want to delete this event?")) {
+      if (confirm("Are you sure you want to delete this reminder?")) {
         await deleteEvent(eventId);
       }
     });
@@ -843,9 +915,14 @@ function updateEventFormFields(eventType) {
   const interviewFields = document.getElementById("interview-fields");
   const assignmentFields = document.getElementById("assignment-fields");
 
-  applicationFields.style.display = eventType === "application" ? "block" : "none";
-  interviewFields.style.display = eventType === "interview" ? "block" : "none";
-  assignmentFields.style.display = eventType === "assignment" ? "block" : "none";
+  // Map kinds to UI sections
+  // DEADLINE -> applicationFields (has 'event-deadline')
+  // INTERVIEW -> interviewFields
+  // FOLLOWUP -> assignmentFields (has 'event-assignment-deadline')
+  
+  if (applicationFields) applicationFields.style.display = eventType === "DEADLINE" ? "block" : "none";
+  if (interviewFields) interviewFields.style.display = eventType === "INTERVIEW" ? "block" : "none";
+  if (assignmentFields) assignmentFields.style.display = eventType === "FOLLOWUP" ? "block" : "none";
 }
 
 async function saveEvent(eventId) {
@@ -856,79 +933,77 @@ async function saveEvent(eventId) {
   const eventColor = document.getElementById("event-color").value;
 
   if (!eventTitle) {
-    alert("Please enter an event title");
+    alert("Please enter a title");
     return;
   }
 
   const payload = {
-    type: eventType,
+    kind: eventType,
     title: eventTitle,
-    applicationId: eventApplicationId ? parseInt(eventApplicationId) : null,
+    application_id: eventApplicationId ? parseInt(eventApplicationId) : null,
     notes: eventNotes,
     color: eventColor,
   };
 
   // Add type-specific fields
-  if (eventType === "application") {
+  if (eventType === "DEADLINE") {
     const deadline = document.getElementById("event-deadline").value;
     if (!deadline) {
       alert("Please enter a deadline");
       return;
     }
-    payload.deadline = deadline;
-  } else if (eventType === "interview") {
+    payload.trigger_at = deadline;
+  } else if (eventType === "INTERVIEW") {
     const startDate = document.getElementById("event-start-date").value;
     if (!startDate) {
       alert("Please enter a start date");
       return;
     }
-    payload.startDate = startDate;
-    payload.endDate = document.getElementById("event-end-date").value || startDate;
-    payload.startTime = document.getElementById("event-start-time").value;
-    payload.endTime = document.getElementById("event-end-time").value;
+    payload.trigger_at = startDate;
+    payload.end_date = document.getElementById("event-end-date").value || startDate;
+    payload.start_time = document.getElementById("event-start-time").value;
+    payload.end_time = document.getElementById("event-end-time").value;
     payload.location = document.getElementById("event-location").value;
-    payload.meetingLink = document.getElementById("event-meeting-link").value;
-  } else if (eventType === "assignment") {
+    payload.meeting_link = document.getElementById("event-meeting-link").value;
+  } else if (eventType === "FOLLOWUP") {
     const deadline = document.getElementById("event-assignment-deadline").value;
     if (!deadline) {
       alert("Please enter a deadline");
       return;
     }
-    payload.deadline = deadline;
+    payload.trigger_at = deadline;
   }
 
   try {
     if (eventId) {
-      await fetchJson(`/api/events/${eventId}`, {
+      await fetchJson(`/api/reminders/${eventId}`, {
         method: "PUT",
         body: JSON.stringify(payload),
       });
     } else {
-      await fetchJson("/api/events", {
+      await fetchJson("/api/reminders", {
         method: "POST",
         body: JSON.stringify(payload),
       });
     }
     closeEventModal();
-    // Reload page to refresh events and status (auto-updated on backend)
     window.location.reload();
   } catch (err) {
-    console.error("Failed to save event:", err);
-    alert("Failed to save event. Please try again.");
+    console.error("Failed to save reminder:", err);
+    alert("Failed to save reminder. Please try again.");
   }
 }
 
 async function deleteEvent(eventId) {
   try {
-    await fetchJson(`/api/events/${eventId}`, {
+    await fetchJson(`/api/reminders/${eventId}`, {
       method: "DELETE",
     });
     closeEventModal();
-    // Reload page to refresh events and status (auto-updated on backend)
     window.location.reload();
   } catch (err) {
-    console.error("Failed to delete event:", err);
-    alert("Failed to delete event. Please try again.");
+    console.error("Failed to delete reminder:", err);
+    alert("Failed to delete reminder. Please try again.");
   }
 }
 
@@ -953,17 +1028,43 @@ async function initNewApplicationPage() {
     saveBtn.disabled = true;
 
     const formData = new FormData(form);
+    const jobLink = formData.get("jobLink") || "";
+    
+    // Note: form fields in HTML need to match what we grab here.
+    // Assuming HTML names are company, title, location, jobType, jobLink, deadline, salaryRange, status, notes
     const payload = {
       company: formData.get("company") || "",
       title: formData.get("title") || "",
       location: formData.get("location") || "",
-      jobType: formData.get("jobType") || "Full-time",
-      jobLink: formData.get("jobLink") || "",
-      deadline: formData.get("deadline") || null,
-      salaryRange: formData.get("salaryRange") || "",
-      status: formData.get("status") || "Applied",
+      job_type: formData.get("jobType") || "Full-time",
+      job_link: jobLink,
+      links: jobLink ? { job_post: jobLink } : {},
+      deadline_at: formData.get("deadline") || null,
+      salary: formData.get("salaryRange") || "",
+      status: formData.get("status") || "APPLIED", // Default APPLIED
       notes: formData.get("notes") || "",
     };
+    
+    // Map status from UI value (if it uses old values) to new ENUMs
+    // But status select in new_application.html likely has values like "Applied"
+    // We should probably update the HTML too, or map it here.
+    // For now, let's assume we map common old values to new ones if needed.
+    // Or if the user updates the HTML to send DRAFT/APPLIED etc.
+    // The prompt said "rename fields in json... without changing appearance". 
+    // It didn't say update HTML values. But if HTML sends "Applied", backend expects "APPLIED".
+    // I will map here to be safe.
+    
+    const statusMap = {
+        "Pending Apply": "DRAFT",
+        "Applied": "APPLIED", // Standard
+        "Under Review": "APPLIED",
+        "Pending Interview": "INTERVIEW",
+        "Offered": "OFFER",
+        "Rejected": "REJECTED"
+    };
+    if (statusMap[payload.status]) {
+        payload.status = statusMap[payload.status];
+    }
 
     if (!payload.company || !payload.title) {
       alert("Please fill in required fields: Company Name and Job Title.");
@@ -1000,9 +1101,9 @@ async function initDashboardPage() {
 
     if (totalEl) totalEl.textContent = summary.totalApplications ?? 0;
     if (interviewingEl)
-      interviewingEl.textContent = (summary.byStatus || {})["Pending Interview / Assignment"] ?? 0;
+      interviewingEl.textContent = (summary.byStatus || {})["INTERVIEW"] ?? 0;
     if (offersEl)
-      offersEl.textContent = (summary.byStatus || {})["Offered"] ?? 0;
+      offersEl.textContent = (summary.byStatus || {})["OFFER"] ?? 0;
 
     // Fetch both events and applications
     const [calendarEvents, applications] = await Promise.all([
@@ -1112,44 +1213,6 @@ function getEventIcon(color) {
   return icons[color] || icons.blue;
 }
 
-// --- Helpers -----------------------------------------------------------------
-
-function renderStatusTag(status) {
-  const map = {
-    "Pending Apply": "tag-pending",
-    "Under Review": "tag-reviewing",
-    "Pending Interview / Assignment": "tag-interview",
-    "Offered": "tag-offer",
-    "Rejected": "tag-rejected",
-    // Legacy statuses for backward compatibility
-    Interview: "tag-interview",
-    Applied: "tag-applied",
-    Reviewing: "tag-reviewing",
-  };
-  const cls = map[status] || "tag-reviewing";
-  return `<span class="status-chip ${cls}">${status}</span>`;
-}
-
-function renderStatusDropdown(currentStatus, appId) {
-  const statuses = [
-    "Pending Apply",
-    "Under Review",
-    "Pending Interview / Assignment",
-    "Offered",
-    "Rejected"
-  ];
-  
-  const options = statuses.map(status => 
-    `<option value="${status}" ${status === currentStatus ? 'selected' : ''}>${status}</option>`
-  ).join('');
-  
-  return `
-    <select class="status-dropdown" data-app-id="${appId}">
-      ${options}
-    </select>
-  `;
-}
-
 function formatShortDate(iso) {
   if (!iso) return "-";
   const d = new Date(iso);
@@ -1175,5 +1238,3 @@ document.addEventListener("DOMContentLoaded", () => {
   initNewApplicationPage();
   initDashboardPage();
 });
-
-

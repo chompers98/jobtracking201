@@ -17,12 +17,20 @@ user_data = {
     "id": 1,
     "email": "user@example.com",
     "username": "John Doe",
+    "password_hash": "pbkdf2:sha256:150000$hashedsecret",
+    "role": "USER",
+    "email_processing_state": {
+        "last_uid": 0
+    },
     "integrations": {
         "google": {
             "enabled": False,
             "email": "",
             "clientId": "",
             "clientSecret": "",
+            "access_token": "",
+            "refresh_token": "",
+            "expires_at": "",
             "gmailEnabled": True,
             "calendarEnabled": True,
         },
@@ -39,15 +47,17 @@ applications = [
         "id": 1,
         "company": "Google",
         "title": "Software Engineer",
-        "status": "Pending Interview / Assignment",
-        "deadline": "2025-11-15",
+        "status": "INTERVIEW",
+        "deadline_at": "2025-11-15",
+        "interview_at": "2025-11-15T14:00:00",
+        "links": {"job_post": "https://careers.google.com/jobs/12345"},
         "location": "Mountain View, CA",
-        "jobType": "Full-time",
-        "salaryRange": "$120k - $180k",
-        "jobLink": "https://careers.google.com/jobs/12345",
+        "job_type": "Full-time",
+        "salary": "$120k - $180k",
+        "job_link": "https://careers.google.com/jobs/12345", # Kept for backward compat
         "experience": "3-5 years",
-        "createdAt": "2025-10-25",
-        "appliedAt": "2025-10-28",
+        "created_at": "2025-10-25",
+        "applied_at": "2025-10-28",
         "documents": [
             {"label": "Resume_2025.pdf", "url": "#"},
             {"label": "Cover_Letter_Google.pdf", "url": "#"},
@@ -63,15 +73,17 @@ applications = [
         "id": 2,
         "company": "Microsoft",
         "title": "Product Manager",
-        "status": "Under Review",
-        "deadline": "2025-11-20",
+        "status": "APPLIED",
+        "deadline_at": "2025-11-20",
+        "interview_at": None,
+        "links": {"job_post": "https://careers.microsoft.com/jobs/23456"},
         "location": "Redmond, WA",
-        "jobType": "Full-time",
-        "salaryRange": "$140k - $190k",
-        "jobLink": "https://careers.microsoft.com/jobs/23456",
+        "job_type": "Full-time",
+        "salary": "$140k - $190k",
+        "job_link": "https://careers.microsoft.com/jobs/23456",
         "experience": "3-5 years",
-        "createdAt": "2025-10-26",
-        "appliedAt": "2025-10-29",
+        "created_at": "2025-10-26",
+        "applied_at": "2025-10-29",
         "documents": [],
         "notes": "",
     },
@@ -79,101 +91,109 @@ applications = [
         "id": 3,
         "company": "Amazon",
         "title": "Data Scientist",
-        "status": "Pending Apply",
-        "deadline": "2025-11-18",
+        "status": "DRAFT",
+        "deadline_at": "2025-11-18",
+        "interview_at": None,
+        "links": {"job_post": "https://amazon.jobs/en/jobs/34567"},
         "location": "Seattle, WA",
-        "jobType": "Full-time",
-        "salaryRange": "$130k - $175k",
-        "jobLink": "https://amazon.jobs/en/jobs/34567",
+        "job_type": "Full-time",
+        "salary": "$130k - $175k",
+        "job_link": "https://amazon.jobs/en/jobs/34567",
         "experience": "2-4 years",
-        "createdAt": "2025-10-26",
-        "appliedAt": "2025-10-30",
+        "created_at": "2025-10-26",
+        "applied_at": "2025-10-30",
         "documents": [],
         "notes": "",
     },
 ]
 
-# Valid status values
+# Valid status values (from schema)
 VALID_STATUSES = [
-    "Pending Apply",
-    "Under Review",
-    "Pending Interview / Assignment",
-    "Offered",
-    "Rejected"
+    "DRAFT",
+    "APPLIED",
+    "INTERVIEW",
+    "OFFER",
+    "REJECTED"
 ]
 
-# Events storage
-events = [
+# Reminders storage (formerly events)
+reminders = [
     {
         "id": 1,
-        "type": "interview",  # application, interview, assignment
+        "kind": "INTERVIEW",  # DEADLINE, INTERVIEW, FOLLOWUP
         "title": "Google Interview",
-        "applicationId": 1,
-        "startDate": "2025-11-15",
-        "endDate": "2025-11-15",
-        "startTime": "14:00",
-        "endTime": "15:00",
+        "application_id": 1,
+        "trigger_at": "2025-11-15", # Was startDate
+        "sent_at": None,
+        "end_date": "2025-11-15",
+        "start_time": "14:00",
+        "end_time": "15:00",
         "location": "Mountain View Office",
-        "meetingLink": "https://meet.google.com/abc-defg-hij",
+        "meeting_link": "https://meet.google.com/abc-defg-hij",
         "notes": "Technical interview round 2",
         "color": "green",
-        "createdAt": "2025-10-28"
+        "created_at": "2025-10-28"
     },
     {
         "id": 2,
-        "type": "application",
+        "kind": "DEADLINE", # Was application type
         "title": "Microsoft Application Deadline",
-        "applicationId": 2,
-        "deadline": "2025-11-20",
+        "application_id": 2,
+        "trigger_at": "2025-11-20", # Was deadline
+        "sent_at": None,
         "notes": "",
         "color": "red",
-        "createdAt": "2025-10-29"
+        "created_at": "2025-10-29"
     },
 ]
 
-# Event ID counter
-next_event_id = 3
+# Reminder ID counter
+next_reminder_id = 3
 
 
-def _find_event(event_id: int):
-    return next((e for e in events if e["id"] == event_id), None)
+def _find_reminder(reminder_id: int):
+    return next((r for r in reminders if r["id"] == reminder_id), None)
 
 
-def _get_event_color(event_type: str):
-    """Get default color based on event type"""
+def _get_reminder_color(kind: str):
+    """Get default color based on reminder kind"""
     colors = {
-        "application": "red",
-        "interview": "green",
-        "assignment": "orange"
+        "DEADLINE": "red",
+        "INTERVIEW": "green",
+        "FOLLOWUP": "orange"
     }
-    return colors.get(event_type, "blue")
+    return colors.get(kind, "blue")
+
+
+def _find_application(app_id: int):
+    return next((a for a in applications if a["id"] == app_id), None)
 
 
 def _auto_update_application_status(app_id: int):
-    """Auto-update application status based on events"""
+    """Auto-update application status based on reminders"""
     app = _find_application(app_id)
     if not app:
         return None
     
-    # Get all events for this application
-    app_events = [e for e in events if e.get("applicationId") == app_id]
+    # Get all reminders for this application
+    app_reminders = [r for r in reminders if r.get("application_id") == app_id]
     
     new_status = None
     
-    if not app_events:
-        # No events, set to Pending Apply or Under Review based on appliedAt
-        if app.get("appliedAt"):
-            new_status = "Under Review"
+    if not app_reminders:
+        # No reminders, set to DRAFT or APPLIED based on applied_at
+        if app.get("applied_at"):
+            new_status = "APPLIED"
         else:
-            new_status = "Pending Apply"
+            new_status = "DRAFT"
     else:
-        # Check for offer/rejection keywords in event titles or notes
+        # Check for offer/rejection keywords in titles or notes
         has_offer = False
         has_rejection = False
         
-        for event in app_events:
-            title_lower = (event.get("title") or "").lower()
-            notes_lower = (event.get("notes") or "").lower()
+        for r in app_reminders:
+            title_lower = (r.get("title") or "").lower()
+            notes_lower = (r.get("notes") or "").lower()
             
             # Check for offer keywords
             if any(keyword in title_lower or keyword in notes_lower 
@@ -187,20 +207,19 @@ def _auto_update_application_status(app_id: int):
         
         # Set status based on findings (rejection takes precedence)
         if has_rejection:
-            new_status = "Rejected"
+            new_status = "REJECTED"
         elif has_offer:
-            new_status = "Offered"
+            new_status = "OFFER"
         else:
-            # Check for interview or assignment events
-            has_interview = any(e.get("type") == "interview" for e in app_events)
-            has_assignment = any(e.get("type") == "assignment" for e in app_events)
+            # Check for interview or assignment (DEADLINE)
+            has_interview = any(r.get("kind") == "INTERVIEW" for r in app_reminders)
             
-            if has_interview or has_assignment:
-                new_status = "Pending Interview / Assignment"
-            elif app.get("appliedAt"):
-                new_status = "Under Review"
+            if has_interview:
+                new_status = "INTERVIEW"
+            elif app.get("applied_at"):
+                new_status = "APPLIED"
             else:
-                new_status = "Pending Apply"
+                new_status = "DRAFT"
     
     # Update status if it changed
     if new_status and new_status != app["status"]:
@@ -209,61 +228,61 @@ def _auto_update_application_status(app_id: int):
     return new_status
 
 
-def generate_calendar_events():
+def generate_calendar_reminders():
     """Generate calendar events in format expected by frontend calendar"""
-    calendar_events = []
+    # Note: The frontend calendar might still expect 'date', 'color', 'title'.
+    # We will produce a view model that the frontend can consume, using snake_case where possible
+    # but adhering to what the calendar might need if we didn't update it fully yet.
+    # BUT I will update the frontend to use 'trigger_at' instead of 'date'.
     
-    for event in events:
-        event_type = event.get("type")
+    calendar_items = []
+    
+    for r in reminders:
+        kind = r.get("kind")
         
-        if event_type == "application":
-            # Application deadline - single date
-            calendar_events.append({
-                "id": event["id"],
-                "title": event.get("title", "Application Deadline"),
+        if kind == "DEADLINE":
+            # Deadline - single date
+            calendar_items.append({
+                "id": r["id"],
+                "title": r.get("title", "Deadline"),
                 "subtitle": "",
-                "date": event.get("deadline"),
-                "color": event.get("color", "red"),
-                "applicationId": event.get("applicationId"),
-                "type": "application"
+                "date": r.get("trigger_at"), # Front end will need update
+                "color": r.get("color", "red"),
+                "application_id": r.get("application_id"),
+                "kind": "DEADLINE"
             })
         
-        elif event_type == "interview":
-            # Interview - has date range and time
-            start_date = event.get("startDate")
+        elif kind == "INTERVIEW":
+            # Interview
+            trigger_at = r.get("trigger_at")
             time_info = ""
-            if event.get("startTime"):
-                time_info = event["startTime"]
-                if event.get("endTime"):
-                    time_info += f" - {event['endTime']}"
+            if r.get("start_time"):
+                time_info = r["start_time"]
+                if r.get("end_time"):
+                    time_info += f" - {r['end_time']}"
             
-            calendar_events.append({
-                "id": event["id"],
-                "title": event.get("title", "Interview"),
+            calendar_items.append({
+                "id": r["id"],
+                "title": r.get("title", "Interview"),
                 "subtitle": time_info,
-                "date": start_date,
-                "color": event.get("color", "green"),
-                "applicationId": event.get("applicationId"),
-                "type": "interview"
+                "date": trigger_at,
+                "color": r.get("color", "green"),
+                "application_id": r.get("application_id"),
+                "kind": "INTERVIEW"
             })
-        
-        elif event_type == "assignment":
-            # Assignment - has deadline
-            calendar_events.append({
-                "id": event["id"],
-                "title": event.get("title", "Assignment Due"),
+            
+        elif kind == "FOLLOWUP":
+            calendar_items.append({
+                "id": r["id"],
+                "title": r.get("title", "Follow Up"),
                 "subtitle": "",
-                "date": event.get("deadline"),
-                "color": event.get("color", "orange"),
-                "applicationId": event.get("applicationId"),
-                "type": "assignment"
+                "date": r.get("trigger_at"),
+                "color": r.get("color", "orange"),
+                "application_id": r.get("application_id"),
+                "kind": "FOLLOWUP"
             })
     
-    return calendar_events
-
-
-def _find_application(app_id: int):
-    return next((a for a in applications if a["id"] == app_id), None)
+    return calendar_items
 
 
 # --- Static file routes -----------------------------------------------------
@@ -302,18 +321,25 @@ def create_application():
         "id": new_id,
         "company": data.get("company", ""),
         "title": data.get("title", ""),
-        "status": data.get("status", "Pending Apply"),
-        "deadline": data.get("deadline"),
+        "status": data.get("status", "DRAFT"),
+        "deadline_at": data.get("deadline_at"),
+        "interview_at": data.get("interview_at"),
+        "links": data.get("links", {}),
         "location": data.get("location", ""),
-        "jobType": data.get("jobType", "Full-time"),
-        "salaryRange": data.get("salaryRange", ""),
-        "jobLink": data.get("jobLink", ""),
+        "job_type": data.get("job_type", "Full-time"),
+        "salary": data.get("salary", ""),
+        "job_link": data.get("job_link", ""),
         "experience": data.get("experience", ""),
-        "createdAt": today_str,
-        "appliedAt": data.get("appliedAt", today_str),
+        "created_at": today_str,
+        "applied_at": data.get("applied_at", today_str),
         "documents": data.get("documents", []),
         "notes": data.get("notes", ""),
     }
+    
+    # Populate links from job_link if not present
+    if not new_app["links"] and new_app["job_link"]:
+        new_app["links"] = {"job_post": new_app["job_link"]}
+        
     applications.append(new_app)
     return jsonify(new_app), 201
 
@@ -337,11 +363,13 @@ def update_application(app_id: int):
         "company",
         "title",
         "status",
-        "deadline",
+        "deadline_at",
+        "interview_at",
+        "links",
         "location",
-        "jobType",
-        "salaryRange",
-        "jobLink",
+        "job_type",
+        "salary",
+        "job_link",
         "experience",
         "documents",
         "notes",
@@ -370,136 +398,119 @@ def update_application_status(app_id: int):
 
 
 @app.get("/api/apps/calendar")
-def get_calendar_events():
-    """Generate and return calendar events from application data"""
-    calendar_events = generate_calendar_events()
-    return jsonify(calendar_events)
+def get_calendar_reminders_route():
+    """Generate and return calendar reminders from application data"""
+    calendar_items = generate_calendar_reminders()
+    return jsonify(calendar_items)
 
 
-@app.get("/api/events")
-def get_events():
-    """Get all events"""
-    return jsonify(events)
+@app.get("/api/reminders")
+def get_reminders():
+    """Get all reminders"""
+    return jsonify(reminders)
 
 
-@app.post("/api/events")
-def create_event():
-    """Create a new event"""
-    global next_event_id
+@app.post("/api/reminders")
+def create_reminder():
+    """Create a new reminder"""
+    global next_reminder_id
     data = request.get_json() or {}
     
-    event_type = data.get("type")
-    if event_type not in ["application", "interview", "assignment"]:
-        abort(400, "Invalid event type. Must be: application, interview, or assignment")
+    kind = data.get("kind")
+    if kind not in ["DEADLINE", "INTERVIEW", "FOLLOWUP"]:
+        abort(400, "Invalid reminder kind. Must be: DEADLINE, INTERVIEW, or FOLLOWUP")
     
-    # Validate required fields based on type
-    if event_type == "application":
-        if not data.get("deadline"):
-            abort(400, "Application events require a deadline")
-    elif event_type == "interview":
-        if not data.get("startDate"):
-            abort(400, "Interview events require a startDate")
-    elif event_type == "assignment":
-        if not data.get("deadline"):
-            abort(400, "Assignment events require a deadline")
+    if not data.get("trigger_at"):
+        abort(400, "Reminders require a trigger_at date")
     
-    new_event = {
-        "id": next_event_id,
-        "type": event_type,
+    new_reminder = {
+        "id": next_reminder_id,
+        "kind": kind,
         "title": data.get("title", ""),
-        "applicationId": data.get("applicationId"),
+        "application_id": data.get("application_id"),
         "notes": data.get("notes", ""),
-        "color": data.get("color", _get_event_color(event_type)),
-        "createdAt": date.today().isoformat()
+        "color": data.get("color", _get_reminder_color(kind)),
+        "created_at": date.today().isoformat(),
+        "trigger_at": data.get("trigger_at"),
+        "sent_at": data.get("sent_at"),
     }
     
     # Add type-specific fields
-    if event_type == "application":
-        new_event["deadline"] = data.get("deadline")
-    elif event_type == "interview":
-        new_event["startDate"] = data.get("startDate")
-        new_event["endDate"] = data.get("endDate", data.get("startDate"))
-        new_event["startTime"] = data.get("startTime", "")
-        new_event["endTime"] = data.get("endTime", "")
-        new_event["location"] = data.get("location", "")
-        new_event["meetingLink"] = data.get("meetingLink", "")
-    elif event_type == "assignment":
-        new_event["deadline"] = data.get("deadline")
+    if kind == "INTERVIEW":
+        new_reminder["end_date"] = data.get("end_date", data.get("trigger_at"))
+        new_reminder["start_time"] = data.get("start_time", "")
+        new_reminder["end_time"] = data.get("end_time", "")
+        new_reminder["location"] = data.get("location", "")
+        new_reminder["meeting_link"] = data.get("meeting_link", "")
     
-    events.append(new_event)
-    next_event_id += 1
+    reminders.append(new_reminder)
+    next_reminder_id += 1
     
     # Auto-update application status if linked to an application
-    if new_event.get("applicationId"):
-        _auto_update_application_status(new_event["applicationId"])
+    if new_reminder.get("application_id"):
+        _auto_update_application_status(new_reminder["application_id"])
     
-    return jsonify(new_event), 201
+    return jsonify(new_reminder), 201
 
 
-@app.get("/api/events/<int:event_id>")
-def get_event(event_id: int):
-    """Get a specific event"""
-    event = _find_event(event_id)
-    if not event:
+@app.get("/api/reminders/<int:reminder_id>")
+def get_reminder(reminder_id: int):
+    """Get a specific reminder"""
+    reminder = _find_reminder(reminder_id)
+    if not reminder:
         abort(404)
-    return jsonify(event)
+    return jsonify(reminder)
 
 
-@app.put("/api/events/<int:event_id>")
-def update_event(event_id: int):
-    """Update an existing event"""
-    event = _find_event(event_id)
-    if not event:
+@app.put("/api/reminders/<int:reminder_id>")
+def update_reminder(reminder_id: int):
+    """Update an existing reminder"""
+    reminder = _find_reminder(reminder_id)
+    if not reminder:
         abort(404)
     
     data = request.get_json() or {}
     
     # Update common fields
-    for key in ["title", "applicationId", "notes", "color"]:
+    for key in ["title", "application_id", "notes", "color", "trigger_at", "sent_at"]:
         if key in data:
-            event[key] = data[key]
+            reminder[key] = data[key]
     
-    # Update type-specific fields based on event type
-    if event["type"] == "application":
-        if "deadline" in data:
-            event["deadline"] = data["deadline"]
-    elif event["type"] == "interview":
-        for key in ["startDate", "endDate", "startTime", "endTime", "location", "meetingLink"]:
+    # Update kind-specific fields
+    if reminder["kind"] == "INTERVIEW":
+        for key in ["end_date", "start_time", "end_time", "location", "meeting_link"]:
             if key in data:
-                event[key] = data[key]
-    elif event["type"] == "assignment":
-        if "deadline" in data:
-            event["deadline"] = data["deadline"]
+                reminder[key] = data[key]
     
     # Auto-update application status if linked to an application
-    if event.get("applicationId"):
-        _auto_update_application_status(event["applicationId"])
+    if reminder.get("application_id"):
+        _auto_update_application_status(reminder["application_id"])
     
-    return jsonify(event)
+    return jsonify(reminder)
 
 
-@app.delete("/api/events/<int:event_id>")
-def delete_event(event_id: int):
-    """Delete an event"""
-    event = _find_event(event_id)
-    if not event:
+@app.delete("/api/reminders/<int:reminder_id>")
+def delete_reminder(reminder_id: int):
+    """Delete a reminder"""
+    reminder = _find_reminder(reminder_id)
+    if not reminder:
         abort(404)
     
-    app_id = event.get("applicationId")
-    events.remove(event)
+    app_id = reminder.get("application_id")
+    reminders.remove(reminder)
     
     # Auto-update application status after deletion
     if app_id:
         _auto_update_application_status(app_id)
     
-    return jsonify({"success": True, "message": "Event deleted"}), 200
+    return jsonify({"success": True, "message": "Reminder deleted"}), 200
 
 
-@app.get("/api/apps/<int:app_id>/events")
-def get_application_events(app_id: int):
-    """Get all events for a specific application"""
-    app_events = [e for e in events if e.get("applicationId") == app_id]
-    return jsonify(app_events)
+@app.get("/api/apps/<int:app_id>/reminders")
+def get_application_reminders(app_id: int):
+    """Get all reminders for a specific application"""
+    app_reminders = [r for r in reminders if r.get("application_id") == app_id]
+    return jsonify(app_reminders)
 
 
 @app.get("/api/dashboard-summary")
@@ -566,6 +577,9 @@ def delete_google_integration():
         "email": "",
         "clientId": "",
         "clientSecret": "",
+        "access_token": "",
+        "refresh_token": "",
+        "expires_at": "",
         "gmailEnabled": True,
         "calendarEnabled": True,
     }
@@ -594,11 +608,6 @@ def validate_google_integration():
     # Validate Google Client Secret format
     if not client_secret or len(client_secret) < 24:
         return jsonify({"valid": False, "error": "Invalid Client Secret format"}), 400
-    
-    # In a real application, you would:
-    # 1. Attempt to exchange credentials with Google OAuth
-    # 2. Verify the credentials are actually valid
-    # For this demo, we'll just validate the format
     
     return jsonify({
         "valid": True,
@@ -641,10 +650,9 @@ def get_user_data():
         "id": user_data["id"],
         "email": user_data["email"],
         "username": user_data["username"],
+        "role": user_data["role"],
     })
 
 
 if __name__ == "__main__":
     app.run(debug=True)
-
-
