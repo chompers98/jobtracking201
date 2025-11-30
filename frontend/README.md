@@ -42,6 +42,7 @@ Then visit `http://localhost:8000/index.html`.
 - **Dashboard (`dashboard.html`)**: small summary cards powered by `/api/dashboard-summary`.
 - **Applications (`index.html`)**: table of applications with client-side search and filters; rows link to details.
 - **Application Detail (`application_detail.html`)**: job details, timeline, notes, and documents using `/api/apps/:id`.
+- **Recommendations (`recommendations.html`)**: list of recommended jobs to apply for using `/api/jobs`.
 - **Calendar (`calendar.html`)**: calendar rendering reminders from `/api/apps/calendar`.
 - **Create New Application (`new_application.html`)**: form that POSTs to `/api/apps` and then redirects back to the list.
 - **Integrations (`integrations.html`)**: manage Google and OpenAI integrations.
@@ -200,9 +201,44 @@ Simplified format for calendar display:
 }
 ```
 
+#### Job Object (Recommendations)
+
+```json
+{
+  "id": 1,
+  "title": "Frontend Developer",
+  "company": "Tech Corp",
+  "salary": "$100k - $140k",
+  "description": "We are looking for a skilled Frontend Developer...",
+  "location": "San Francisco, CA",
+  "job_type": "Full-time",
+  "job_link": "https://example.com/jobs/1"
+}
+```
+
 ---
 
 ### API Endpoints
+
+#### Jobs (Recommendations)
+
+##### `GET /api/jobs`
+
+Get all recommended jobs.
+
+**Response:** `200 OK`
+```json
+[
+  {
+    "id": 1,
+    "title": "Frontend Developer",
+    "company": "Tech Corp",
+    ...
+  }
+]
+```
+
+---
 
 #### Applications
 

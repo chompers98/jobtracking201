@@ -1014,11 +1014,88 @@ function closeEventModal() {
   }
 }
 
+// --- Recommendations page ----------------------------------------------------
+
+async function initRecommendationsPage() {
+  const tableBody = document.querySelector("#recommendations-tbody");
+  if (!tableBody) return;
+
+  const searchInput = document.querySelector("#search-input");
+  const countLabel = document.querySelector("#recommendations-count");
+
+  let allJobs = [];
+
+  function render(jobs) {
+    tableBody.innerHTML = "";
+    jobs.forEach((job) => {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${job.company}</td>
+        <td>${job.title}</td>
+        <td>${job.location || "-"}</td>
+        <td>${job.salary || "-"}</td>
+        <td class="link-cell">
+          <button class="primary-btn small" style="padding: 4px 8px; font-size: 0.8rem;" onclick="window.location.href='new_application.html?company=${encodeURIComponent(job.company)}&title=${encodeURIComponent(job.title)}&location=${encodeURIComponent(job.location||'')}&salaryRange=${encodeURIComponent(job.salary||'')}&jobLink=${encodeURIComponent(job.job_link||'')}'">
+            Apply
+          </button>
+        </td>
+      `;
+      tableBody.appendChild(tr);
+    });
+
+    if (countLabel) {
+      countLabel.textContent = `Showing ${jobs.length} jobs`;
+    }
+  }
+
+  try {
+    allJobs = await fetchJson("/api/jobs");
+    render(allJobs);
+
+    if (searchInput) {
+      searchInput.addEventListener("input", (e) => {
+        const term = e.target.value.toLowerCase();
+        const filtered = allJobs.filter(
+          (j) =>
+            j.company.toLowerCase().includes(term) ||
+            j.title.toLowerCase().includes(term)
+        );
+        render(filtered);
+      });
+    }
+  } catch (err) {
+    console.error("Failed to load recommendations:", err);
+  }
+}
+
 // --- New application page ----------------------------------------------------
 
 async function initNewApplicationPage() {
   const form = document.querySelector("#new-application-form");
   if (!form) return;
+
+  // Handle pre-fill from query params (e.g. coming from Recommendations)
+  const params = new URLSearchParams(window.location.search);
+  if (params.has("company")) {
+    const companyInput = form.querySelector("[name='company']");
+    if (companyInput) companyInput.value = params.get("company");
+  }
+  if (params.has("title")) {
+    const titleInput = form.querySelector("[name='title']");
+    if (titleInput) titleInput.value = params.get("title");
+  }
+  if (params.has("location")) {
+    const locationInput = form.querySelector("[name='location']");
+    if (locationInput) locationInput.value = params.get("location");
+  }
+  if (params.has("salaryRange")) {
+    const salaryInput = form.querySelector("[name='salaryRange']");
+    if (salaryInput) salaryInput.value = params.get("salaryRange");
+  }
+  if (params.has("jobLink")) {
+    const jobLinkInput = form.querySelector("[name='jobLink']");
+    if (jobLinkInput) jobLinkInput.value = params.get("jobLink");
+  }
 
   const saveBtn = form.querySelector("button[type=submit]");
 
@@ -1235,6 +1312,7 @@ document.addEventListener("DOMContentLoaded", () => {
   initApplicationsPage();
   initDetailPage();
   initCalendarPage();
+  initRecommendationsPage();
   initNewApplicationPage();
   initDashboardPage();
 });

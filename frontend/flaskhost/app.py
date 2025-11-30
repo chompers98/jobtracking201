@@ -42,6 +42,59 @@ user_data = {
     },
 }
 
+jobs = [
+    {
+        "id": 1,
+        "title": "Frontend Developer",
+        "company": "Tech Corp",
+        "salary": "$100k - $140k",
+        "description": "We are looking for a skilled Frontend Developer to join our team. Experience with React and TypeScript is required.",
+        "location": "San Francisco, CA",
+        "job_type": "Full-time",
+        "job_link": "https://example.com/jobs/1"
+    },
+    {
+        "id": 2,
+        "title": "Backend Engineer",
+        "company": "Data Systems",
+        "salary": "$120k - $160k",
+        "description": "Join our backend team to build scalable systems. Python and Go experience preferred.",
+        "location": "Remote",
+        "job_type": "Full-time",
+        "job_link": "https://example.com/jobs/2"
+    },
+    {
+        "id": 3,
+        "title": "Product Designer",
+        "company": "Creative Solutions",
+        "salary": "$90k - $130k",
+        "description": "Design intuitive user experiences for our mobile and web applications.",
+        "location": "New York, NY",
+        "job_type": "Contract",
+        "job_link": "https://example.com/jobs/3"
+    },
+    {
+        "id": 4,
+        "title": "DevOps Engineer",
+        "company": "Cloud Infra",
+        "salary": "$130k - $170k",
+        "description": "Manage our cloud infrastructure and CI/CD pipelines.",
+        "location": "Austin, TX",
+        "job_type": "Full-time",
+        "job_link": "https://example.com/jobs/4"
+    },
+    {
+        "id": 5,
+        "title": "Marketing Manager",
+        "company": "Growth Inc",
+        "salary": "$80k - $110k",
+        "description": "Lead our marketing campaigns and growth strategies.",
+        "location": "Chicago, IL",
+        "job_type": "Full-time",
+        "job_link": "https://example.com/jobs/5"
+    }
+]
+
 applications = [
     {
         "id": 1,
@@ -301,6 +354,12 @@ def serve_static(filename):
 
 
 # --- API routes -------------------------------------------------------------
+
+
+@app.get("/api/jobs")
+def get_jobs():
+    """Get all jobs (recommendations)"""
+    return jsonify(jobs)
 
 
 @app.get("/api/apps")

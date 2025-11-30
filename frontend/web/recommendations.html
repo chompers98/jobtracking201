@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <title>JobTracker – Dashboard</title>
+    <title>JobTracker – Recommendations</title>
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
@@ -12,7 +12,7 @@
         <p class="nav-section-title">Menu</p>
         <ul class="nav-list">
           <li class="nav-item">
-            <a href="dashboard.html" class="nav-link active">
+            <a href="dashboard.html" class="nav-link">
               <span class="icon icon-dashboard"></span>
               Dashboard
             </a>
@@ -24,7 +24,7 @@
             </a>
           </li>
           <li class="nav-item">
-            <a href="recommendations.html" class="nav-link">
+            <a href="recommendations.html" class="nav-link active">
               <span class="icon icon-recommendations"></span>
               Recommendations
             </a>
@@ -58,45 +58,43 @@
           </div>
         </header>
 
-        <main class="content" id="dashboard-root">
+        <main class="content">
           <div class="page-header">
             <div class="page-title-group">
-              <h1>Dashboard</h1>
-              <p>Overview of your job search</p>
+              <h1>Recommended Jobs</h1>
+              <p>Discover new opportunities tailored for you</p>
             </div>
           </div>
 
-          <section class="dashboard-grid">
-            <div class="card">
-              <div class="metric-card-title">Total Applications</div>
-              <div class="metric-card-value" id="metric-total">0</div>
-              <div class="metric-card-subtext">
-                Across all companies and roles.
+          <section class="card">
+            <div class="table-toolbar">
+              <div class="search-input">
+                <input
+                  id="search-input"
+                  type="text"
+                  placeholder="Search jobs..."
+                />
               </div>
             </div>
-            <div class="card">
-              <div class="metric-card-title">Interviewing</div>
-              <div class="metric-card-value" id="metric-interview">0</div>
-              <div class="metric-card-subtext">
-                Applications currently in interview stages.
-              </div>
-            </div>
-            <div class="card">
-              <div class="metric-card-title">Offers</div>
-              <div class="metric-card-value" id="metric-offers">0</div>
-              <div class="metric-card-subtext">
-                Offers or pending offer decisions.
-              </div>
-            </div>
-          </section>
 
-          <section class="card upcoming-section">
-            <div class="upcoming-header">
-              <h2>Upcoming Events</h2>
-              <a href="calendar.html" class="view-all-link">View Calendar →</a>
-            </div>
-            <div id="upcoming-events-list" class="upcoming-events-list">
-              <div class="upcoming-loading">Loading upcoming events...</div>
+            <table class="app-table">
+              <thead>
+                <tr>
+                  <th>Company</th>
+                  <th>Title</th>
+                  <th>Location</th>
+                  <th>Salary</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody id="recommendations-tbody"></tbody>
+            </table>
+
+            <div class="table-footer">
+              <span id="recommendations-count" class="muted"></span>
+              <div class="pagination">
+                <button class="active">1</button>
+              </div>
             </div>
           </section>
         </main>
@@ -106,3 +104,4 @@
     <script src="app.js"></script>
   </body>
 </html>
+
