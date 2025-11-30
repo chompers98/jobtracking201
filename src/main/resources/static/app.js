@@ -1,4 +1,4 @@
-const API_BASE_URL = "http://localhost:5000";
+const API_BASE_URL = '';
 
 async function fetchJson(path, options = {}) {
   const res = await fetch(`${API_BASE_URL}${path}`, {
@@ -16,15 +16,10 @@ async function fetchJson(path, options = {}) {
 const STATUS_LABELS = {
   "DRAFT": "Pending Apply",
   "APPLIED": "Under Review",
-  "INTERVIEW": "Pending Interview", // Shortened for UI or keep "Pending Interview / Assignment"? Schema is INTERVIEW.
+  "INTERVIEW": "Interview",
   "OFFER": "Offered",
   "REJECTED": "Rejected"
 };
-
-// Also support reverse mapping for display consistency if needed, 
-// but primarily we map the API ENUMs to Display Labels.
-// "Pending Interview / Assignment" was the old label. I'll use "Interview" or similar.
-STATUS_LABELS["INTERVIEW"] = "Interview"; 
 
 function getStatusLabel(status) {
   return STATUS_LABELS[status] || status;
@@ -1135,6 +1130,7 @@ async function initNewApplicationPage() {
         "Pending Apply": "DRAFT",
         "Applied": "APPLIED", // Standard
         "Under Review": "APPLIED",
+        "Pending Interview / Assignment": "INTERVIEW",
         "Pending Interview": "INTERVIEW",
         "Offered": "OFFER",
         "Rejected": "REJECTED"

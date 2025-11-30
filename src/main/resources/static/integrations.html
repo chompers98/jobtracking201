@@ -82,52 +82,21 @@
               </label>
             </div>
             <div class="integration-content" id="google-content" style="display: none;">
-              <div class="integration-instructions">
-                <h4>Setup Instructions</h4>
-                <ol>
-                  <li>Go to <a href="https://console.cloud.google.com/" target="_blank" rel="noreferrer">Google Cloud Console</a></li>
-                  <li>Create a new project or select an existing one</li>
-                  <li>Enable the <strong>Gmail API</strong> and <strong>Google Calendar API</strong></li>
-                  <li>Create OAuth 2.0 credentials (Web application or Desktop app)</li>
-                  <li>Add authorized redirect URI: <code>http://localhost:5000/oauth/google/callback</code></li>
-                  <li>Download the credentials JSON file</li>
-                </ol>
-                <p class="muted">
-                  Required OAuth Scopes: 
-                  <code>gmail.readonly</code>, <code>gmail.modify</code>, 
-                  <code>calendar.events</code>, <code>calendar.readonly</code>
-                </p>
+              <div id="google-connected-view" style="display: none; padding: 2rem; text-align: center; background: #f9fafb; border-radius: 8px; margin-top: 1rem;">
+                <div style="display: flex; flex-direction: column; align-items: center; gap: 1rem;">
+                  <div style="width: 48px; height: 48px; background: #d1fae5; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #059669; font-size: 24px;">✓</div>
+                  <div>
+                    <h4 style="margin: 0; color: #111827;">Connected to Google</h4>
+                    <p id="google-connected-email" style="margin: 5px 0 0; color: #6b7280; font-size: 0.9rem;"></p>
+                  </div>
+                  <button class="secondary-btn" id="google-disconnect-btn" style="border-color: #fee2e2; color: #ef4444; background: white; margin-top: 0.5rem;">Disconnect Account</button>
+                </div>
               </div>
 
-              <div class="form-section">
-                <h4 class="form-section-title">Google Account Details</h4>
-                <div class="form-group">
-                  <label for="google-account">Google Account Email</label>
-                  <input
-                    type="email"
-                    id="google-account"
-                    placeholder="your-email@gmail.com"
-                    class="form-input modern-input"
-                  />
-                </div>
-                <div class="form-group">
-                  <label for="google-client-id">OAuth 2.0 Client ID</label>
-                  <input
-                    type="text"
-                    id="google-client-id"
-                    placeholder="Enter your OAuth 2.0 Client ID"
-                    class="form-input modern-input"
-                  />
-                </div>
-                <div class="form-group">
-                  <label for="google-client-secret">OAuth 2.0 Client Secret</label>
-                  <input
-                    type="password"
-                    id="google-client-secret"
-                    placeholder="Enter your OAuth 2.0 Client Secret"
-                    class="form-input modern-input"
-                  />
-                </div>
+              <div id="google-setup-view">
+                <div class="integration-instructions">
+                <h4>Setup Instructions</h4>
+                <p>Connect your Google account to enable Gmail scanning for job applications.</p>
               </div>
 
               <div class="form-section">
@@ -153,6 +122,7 @@
               <button class="primary-btn" id="google-connect-btn">
                 <span>Connect Google Services</span>
               </button>
+              </div> <!-- End setup view -->
             </div>
           </section>
 
@@ -224,46 +194,14 @@
     <script>
       // Note: API_BASE_URL and fetchJson are already defined in app.js
 
-      // Validation helpers
       function validateEmail(email) {
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         return emailRegex.test(email);
       }
 
-      function validateGoogleClientId(clientId) {
-        // Google Client IDs typically end with .apps.googleusercontent.com
-        return clientId && clientId.length > 20 && clientId.includes('.apps.googleusercontent.com');
-      }
-
-      function validateGoogleClientSecret(secret) {
-        // Google client secrets are typically 24-35 characters
-        return secret && secret.length >= 24;
-      }
-
       function validateOpenAIKey(apiKey) {
         // OpenAI keys start with 'sk-' or 'sk-proj-' and are at least 40 characters
         return apiKey && (apiKey.startsWith('sk-') || apiKey.startsWith('sk-proj-')) && apiKey.length >= 40;
-      }
-
-      // Test credential validity with actual API requests
-      async function testGoogleCredentials(email, clientId, clientSecret) {
-        // Test request to verify Google OAuth credentials structure
-        // In a real implementation, this would initiate OAuth flow or validate with Google
-        try {
-          // Make a test request to our backend to validate credentials
-          const response = await fetchJson("/api/user/integrations/google/validate", {
-            method: "POST",
-            body: JSON.stringify({
-              email: email,
-              clientId: clientId,
-              clientSecret: clientSecret
-            })
-          });
-          return response.valid === true;
-        } catch (error) {
-          console.error("Google credentials validation failed:", error);
-          return false;
-        }
       }
 
       async function testOpenAIKey(apiKey) {
@@ -316,7 +254,7 @@
       }
 
       function clearAllValidationErrors() {
-        ['google-account', 'google-client-id', 'google-client-secret', 'openai-api-key', 'openai-model'].forEach(clearValidationError);
+        ['openai-api-key', 'openai-model'].forEach(clearValidationError);
       }
 
       // Load existing integration settings
@@ -329,9 +267,22 @@
             const google = integrations.google;
             document.getElementById("google-toggle").checked = google.enabled;
             document.getElementById("google-content").style.display = google.enabled ? "block" : "none";
-            document.getElementById("google-account").value = google.email || "";
-            document.getElementById("google-client-id").value = google.clientId || "";
-            document.getElementById("google-client-secret").value = google.clientSecret || "";
+            
+            // Check if connected (has credentials)
+            const isConnected = google.connected; // Updated to match backend property
+            
+            const connectedView = document.getElementById("google-connected-view");
+            const setupView = document.getElementById("google-setup-view");
+            
+            if (isConnected) {
+                connectedView.style.display = "block";
+                setupView.style.display = "none";
+                document.getElementById("google-connected-email").textContent = google.email || "Connected Account";
+            } else {
+                connectedView.style.display = "none";
+                setupView.style.display = "block";
+            }
+
             document.getElementById("enable-gmail").checked = google.gmailEnabled;
             document.getElementById("enable-calendar").checked = google.calendarEnabled;
           }
@@ -399,46 +350,32 @@
       // Initialize toggle handlers
       setupToggleHandlers();
 
+      // Disconnect handler
+      document.getElementById("google-disconnect-btn")?.addEventListener("click", async () => {
+        if (!confirm("Are you sure you want to disconnect Google services? This will stop email tracking.")) {
+            return;
+        }
+        
+        try {
+            await fetchJson("/api/user/integrations/google", {
+                method: "DELETE"
+            });
+            
+            // Reload settings to update UI
+            loadIntegrationSettings();
+        } catch (error) {
+            console.error("Failed to disconnect:", error);
+            alert("Failed to disconnect. Please try again.");
+        }
+      });
+
       // Google connection handler
       document.getElementById("google-connect-btn")?.addEventListener("click", async () => {
         clearAllValidationErrors();
         
-        const email = document.getElementById("google-account").value.trim();
-        const clientId = document.getElementById("google-client-id").value.trim();
-        const clientSecret = document.getElementById("google-client-secret").value.trim();
         const gmailEnabled = document.getElementById("enable-gmail").checked;
         const calendarEnabled = document.getElementById("enable-calendar").checked;
         const toggleEnabled = document.getElementById("google-toggle").checked;
-
-        // Validate email
-        if (!email) {
-          showValidationError("google-account", "Email is required");
-          return;
-        }
-        if (!validateEmail(email)) {
-          showValidationError("google-account", "Please enter a valid email address");
-          return;
-        }
-
-        // Validate Client ID
-        if (!clientId) {
-          showValidationError("google-client-id", "OAuth 2.0 Client ID is required");
-          return;
-        }
-        if (!validateGoogleClientId(clientId)) {
-          showValidationError("google-client-id", "Invalid Client ID format. Should end with .apps.googleusercontent.com");
-          return;
-        }
-
-        // Validate Client Secret
-        if (!clientSecret) {
-          showValidationError("google-client-secret", "OAuth 2.0 Client Secret is required");
-          return;
-        }
-        if (!validateGoogleClientSecret(clientSecret)) {
-          showValidationError("google-client-secret", "Invalid Client Secret format. Should be at least 24 characters");
-          return;
-        }
 
         // Check if at least one service is enabled
         if (!gmailEnabled && !calendarEnabled) {
@@ -448,52 +385,27 @@
 
         const btn = document.getElementById("google-connect-btn");
         btn.disabled = true;
-        btn.querySelector("span").textContent = "Validating...";
-
-        // Test credentials first
-        const isValid = await testGoogleCredentials(email, clientId, clientSecret);
-        
-        if (!isValid) {
-          alert("Failed to validate Google credentials. Please check your Client ID and Client Secret and try again.");
-          btn.querySelector("span").textContent = "Connect Google Services";
-          btn.disabled = false;
-          return;
-        }
-
         btn.querySelector("span").textContent = "Connecting...";
 
         try {
+          // Save preferences first
           await fetchJson("/api/user/integrations", {
             method: "PUT",
             body: JSON.stringify({
               google: {
                 enabled: toggleEnabled,
-                email: email,
-                clientId: clientId,
-                clientSecret: clientSecret,
                 gmailEnabled: gmailEnabled,
                 calendarEnabled: calendarEnabled,
               }
             }),
           });
 
-          const services = [];
-          if (gmailEnabled) services.push("Gmail");
-          if (calendarEnabled) services.push("Calendar");
-
-          btn.querySelector("span").textContent = "✓ Connected";
-          btn.classList.add("success");
+          // Redirect to OAuth flow
+          window.location.href = "/api/oauth/google/authorize";
           
-          setTimeout(() => {
-            btn.querySelector("span").textContent = "Connect Google Services";
-            btn.disabled = false;
-            btn.classList.remove("success");
-          }, 2000);
-
-          alert(`Google services (${services.join(", ")}) connected successfully for ${email}`);
         } catch (error) {
-          console.error("Failed to save Google integration:", error);
-          alert("Failed to save Google integration. Please try again.");
+          console.error("Failed to initiate Google connection:", error);
+          alert("Failed to connect. Please try again.");
           btn.querySelector("span").textContent = "Connect Google Services";
           btn.disabled = false;
         }
