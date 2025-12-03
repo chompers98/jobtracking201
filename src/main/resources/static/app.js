@@ -1,10 +1,142 @@
 const API_BASE_URL = '';
 
+// Check if user is authenticated
+function checkAuthentication() {
+  const jwtToken = localStorage.getItem('jwtToken');
+  if (!jwtToken) {
+    const currentPage = window.location.pathname;
+    const isAuthPage = currentPage.includes('login') || currentPage.includes('register');
+    if (!isAuthPage) {
+      window.location.href = '/login.html';
+    }
+    return false;
+  }
+  return true;
+}
+
+async function handleLogout(event) {
+  if (event) {
+    event.preventDefault();
+  }
+
+  try {
+    const jwtToken = localStorage.getItem('jwtToken');
+    if (jwtToken) {
+      await fetch('/api/auth/logout', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${jwtToken}`,
+        },
+      });
+    }
+  } catch (error) {
+    console.error('Logout error:', error);
+  } finally {
+    localStorage.removeItem('jwtToken');
+    localStorage.removeItem('refreshToken');
+    localStorage.removeItem('user');
+    localStorage.removeItem('expiresAt');
+    window.location.href = '/login.html';
+  }
+}
+
+function updateUserDisplay() {
+  const user = JSON.parse(localStorage.getItem('user') || '{}');
+  const usernameDisplay = document.getElementById('username-display');
+  const avatarDisplay = document.getElementById('avatar-display');
+
+  if (usernameDisplay) {
+    usernameDisplay.textContent = user.username || 'User';
+  }
+
+  if (avatarDisplay) {
+    const initials = user.username
+      ? user.username.substring(0, 2).toUpperCase()
+      : 'U';
+    avatarDisplay.textContent = initials;
+  }
+}
+
+function bindLogoutButton() {
+  const logoutBtn = document.getElementById('logout-btn');
+  if (!logoutBtn || logoutBtn.dataset.bound === 'true') {
+    return;
+  }
+  logoutBtn.dataset.bound = 'true';
+  logoutBtn.addEventListener('click', handleLogout);
+}
+
+function setupAuthUI() {
+  updateUserDisplay();
+  bindLogoutButton();
+}
+
+async function loadNavbar() {
+  const container = document.getElementById('navbar-container');
+  if (!container) {
+    return;
+  }
+
+  try {
+    const response = await fetch('/navbar.html', { cache: 'no-cache' });
+    if (!response.ok) {
+      throw new Error(`Navbar request failed: ${response.status}`);
+    }
+    const markup = await response.text();
+    container.innerHTML = markup;
+    setupAuthUI();
+  } catch (error) {
+    console.error('Failed to load navbar:', error);
+  }
+}
+
+// Check for token expiration
+function isTokenExpired() {
+  const expiresAt = localStorage.getItem('expiresAt');
+  if (!expiresAt) return true;
+  return Date.now() > parseInt(expiresAt);
+}
+
 async function fetchJson(path, options = {}) {
+  // Check if user is authenticated before making requests
+  const jwtToken = localStorage.getItem('jwtToken');
+  
+  // Check for token expiration
+  if (jwtToken && isTokenExpired()) {
+    // Token expired, clear and redirect to login
+    localStorage.removeItem('jwtToken');
+    localStorage.removeItem('refreshToken');
+    localStorage.removeItem('user');
+    localStorage.removeItem('expiresAt');
+    window.location.href = '/login.html';
+    return;
+  }
+  
+  const headers = {
+    "Content-Type": "application/json",
+    ...options.headers
+  };
+  
+  // Add JWT token to Authorization header if available
+  if (jwtToken) {
+    headers['Authorization'] = `Bearer ${jwtToken}`;
+  }
+  
   const res = await fetch(`${API_BASE_URL}${path}`, {
-    headers: { "Content-Type": "application/json" },
     ...options,
+    headers,
   });
+  
+  // Handle 401 Unauthorized (token invalid/expired)
+  if (res.status === 401) {
+    localStorage.removeItem('jwtToken');
+    localStorage.removeItem('refreshToken');
+    localStorage.removeItem('user');
+    localStorage.removeItem('expiresAt');
+    window.location.href = '/login.html';
+    return;
+  }
+  
   if (!res.ok) {
     throw new Error(`Request failed: ${res.status}`);
   }
@@ -1304,7 +1436,14 @@ function formatLongDate(iso) {
 
 // --- Bootstrapping -----------------------------------------------------------
 
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", async () => {
+  const isAuthed = checkAuthentication();
+  await loadNavbar();
+
+  if (isAuthed) {
+    setupAuthUI();
+  }
+
   initApplicationsPage();
   initDetailPage();
   initCalendarPage();
