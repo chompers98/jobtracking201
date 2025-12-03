@@ -9,15 +9,18 @@ import com.google.api.client.json.JsonFactory;
 import com.google.api.client.json.gson.GsonFactory;
 import com.google.api.client.util.store.FileDataStoreFactory;
 import com.google.api.services.gmail.GmailScopes;
-import com.jobtracking.service.GmailBackgroundScanner;
+import com.jobtracking.dto.AuthResponse;
+import com.jobtracking.dto.LoginRequest;
+import com.jobtracking.dto.RegisterRequest;
+import com.jobtracking.service.AuthenticationService;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.stereotype.Controller;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
-import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
 import java.io.FileInputStream;
-import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.util.Collections;
@@ -28,6 +31,9 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api")
 public class AuthController {
+    
+    @Autowired
+    private AuthenticationService authenticationService;
 
     private static final String CREDENTIALS_FILE_PATH = "/credentials.json";
     private static final String CALLBACK_URI = "http://localhost:8080/api/oauth/google/callback";
@@ -45,7 +51,60 @@ public class AuthController {
         googleIntegration.put("connected", false);
     }
 
-    @GetMapping("/oauth/google/authorize")
+    // ==================== USER AUTHENTICATION ENDPOINTS ====================
+
+    /**
+     * POST /api/auth/register
+     * Register a new user account
+     * Request: {email, password, username}
+     * Response: 201 Created with AuthResponse containing JWT token
+     */
+    @PostMapping("/auth/register")
+    public ResponseEntity<?> register(@RequestBody RegisterRequest registerRequest) {
+        try {
+            AuthResponse authResponse = authenticationService.register(registerRequest);
+            return ResponseEntity.status(HttpStatus.CREATED).body(authResponse);
+        } catch (Exception e) {
+            Map<String, String> error = new HashMap<>();
+            error.put("error", e.getMessage());
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(error);
+        }
+    }
+
+    /**
+     * POST /api/auth/login
+     * Authenticate a user and return JWT tokens
+     * Request: {email, password}
+     * Response: {jwt, expires_at, refreshToken, ...}
+     */
+    @PostMapping("/auth/login")
+    public ResponseEntity<?> login(@RequestBody LoginRequest loginRequest) {
+        try {
+            AuthResponse authResponse = authenticationService.login(loginRequest);
+            return ResponseEntity.ok(authResponse);
+        } catch (Exception e) {
+            Map<String, String> error = new HashMap<>();
+            error.put("error", "Invalid credentials");
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(error);
+        }
+    }
+
+    /**
+     * POST /api/auth/logout
+     * Logout the authenticated user
+     * Authorization header required with Bearer token
+     * Response: 200 OK
+     */
+    @PostMapping("/auth/logout")
+    public ResponseEntity<?> logout() {
+        SecurityContextHolder.clearContext();
+        Map<String, String> response = new HashMap<>();
+        response.put("message", "Logged out successfully");
+        return ResponseEntity.ok(response);
+    }
+
+    // ==================== GOOGLE OAUTH ENDPOINTS ====================
+
     public void googleAuthorize(HttpServletResponse response) throws Exception {
         GoogleAuthorizationCodeFlow flow = getFlow();
         String authorizationUrl = flow.newAuthorizationUrl()
@@ -82,6 +141,7 @@ public class AuthController {
     }
     
     @PutMapping("/user/integrations")
+    @SuppressWarnings("unchecked")
     public Map<String, Object> updateUserIntegrations(@RequestBody Map<String, Object> updates) {
         if (updates.containsKey("google")) {
             Map<String, Object> googleUpdates = (Map<String, Object>) updates.get("google");

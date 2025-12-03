@@ -53,8 +53,9 @@
       <div class="main-area">
         <header class="top-bar">
           <div class="top-bar-right">
-            <span>Logout</span>
-            <div class="avatar">JD</div>
+            <span id="username-display">User</span>
+            <button id="logout-btn" class="logout-btn">Logout</button>
+            <div class="avatar" id="avatar-display">U</div>
           </div>
         </header>
 
@@ -117,8 +118,61 @@
       </div>
     </div>
 
+    <script>
+      // Check if user is authenticated
+      function checkAuthentication() {
+        const jwtToken = localStorage.getItem('jwtToken');
+        if (!jwtToken) {
+          // Redirect to login if not authenticated
+          window.location.href = '/login.html';
+          return false;
+        }
+        return true;
+      }
+
+      // Load user info and display
+      function loadUserInfo() {
+        const user = JSON.parse(localStorage.getItem('user') || '{}');
+        const usernameDisplay = document.getElementById('username-display');
+        const avatarDisplay = document.getElementById('avatar-display');
+        
+        if (user.username) {
+          usernameDisplay.textContent = user.username;
+          avatarDisplay.textContent = user.username.substring(0, 2).toUpperCase();
+        }
+      }
+
+      // Setup logout
+      document.getElementById('logout-btn').addEventListener('click', async function() {
+        try {
+          const jwtToken = localStorage.getItem('jwtToken');
+          await fetch('/api/auth/logout', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${jwtToken}`
+            }
+          });
+        } catch (error) {
+          console.error('Logout error:', error);
+        } finally {
+          // Clear localStorage
+          localStorage.removeItem('jwtToken');
+          localStorage.removeItem('refreshToken');
+          localStorage.removeItem('user');
+          localStorage.removeItem('expiresAt');
+          
+          // Redirect to login
+          window.location.href = '/login.html';
+        }
+      });
+
+      // Check authentication on page load
+      if (checkAuthentication()) {
+        loadUserInfo();
+      }
+    </script>
+
     <script src="app.js"></script>
   </body>
 </html>
-
 

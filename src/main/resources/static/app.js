@@ -1,10 +1,66 @@
 const API_BASE_URL = '';
 
+// Check if user is authenticated
+function checkAuthentication() {
+  const jwtToken = localStorage.getItem('jwtToken');
+  if (!jwtToken) {
+    // Redirect to login if not authenticated (except on auth pages)
+    const currentPage = window.location.pathname;
+    if (!currentPage.includes('login') && !currentPage.includes('register') && currentPage !== '/') {
+      window.location.href = '/login.html';
+    }
+    return false;
+  }
+  return true;
+}
+
+// Check for token expiration
+function isTokenExpired() {
+  const expiresAt = localStorage.getItem('expiresAt');
+  if (!expiresAt) return true;
+  return Date.now() > parseInt(expiresAt);
+}
+
 async function fetchJson(path, options = {}) {
+  // Check if user is authenticated before making requests
+  const jwtToken = localStorage.getItem('jwtToken');
+  
+  // Check for token expiration
+  if (jwtToken && isTokenExpired()) {
+    // Token expired, clear and redirect to login
+    localStorage.removeItem('jwtToken');
+    localStorage.removeItem('refreshToken');
+    localStorage.removeItem('user');
+    localStorage.removeItem('expiresAt');
+    window.location.href = '/login.html';
+    return;
+  }
+  
+  const headers = {
+    "Content-Type": "application/json",
+    ...options.headers
+  };
+  
+  // Add JWT token to Authorization header if available
+  if (jwtToken) {
+    headers['Authorization'] = `Bearer ${jwtToken}`;
+  }
+  
   const res = await fetch(`${API_BASE_URL}${path}`, {
-    headers: { "Content-Type": "application/json" },
     ...options,
+    headers,
   });
+  
+  // Handle 401 Unauthorized (token invalid/expired)
+  if (res.status === 401) {
+    localStorage.removeItem('jwtToken');
+    localStorage.removeItem('refreshToken');
+    localStorage.removeItem('user');
+    localStorage.removeItem('expiresAt');
+    window.location.href = '/login.html';
+    return;
+  }
+  
   if (!res.ok) {
     throw new Error(`Request failed: ${res.status}`);
   }
