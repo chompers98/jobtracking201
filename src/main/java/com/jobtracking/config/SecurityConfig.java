@@ -6,6 +6,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
+import org.springframework.boot.autoconfigure.security.servlet.PathRequest;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.annotation.authentication.builders.AuthenticationManagerBuilder;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
@@ -16,6 +17,7 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -61,16 +63,23 @@ public class SecurityConfig {
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(authz -> authz
-                        // Public endpoints
+                        // Protected endpoints first
+                        .requestMatchers("/api/apps/**", "/api/auth/logout", "/api/user/**").authenticated()
+                        // Public auth endpoints
                         .requestMatchers("/api/auth/register", "/api/auth/login").permitAll()
                         .requestMatchers("/api/oauth/google/**").permitAll()
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         // Public static resources
-                        .requestMatchers("/", "/index.html", "/styles.css", "/app.js", "/login.html", "/register.html").permitAll()
-                        // Protected endpoints
-                        .requestMatchers("/api/apps/**").authenticated()
-                        .requestMatchers("/api/auth/logout").authenticated()
-                        .requestMatchers("/api/user/**").authenticated()
+                        .requestMatchers(PathRequest.toStaticResources().atCommonLocations()).permitAll()
+                        .requestMatchers(new AntPathRequestMatcher("/", "GET")).permitAll()
+                        .requestMatchers(new AntPathRequestMatcher("/**/*.html", "GET")).permitAll()
+                        .requestMatchers(new AntPathRequestMatcher("/**/*.css", "GET")).permitAll()
+                        .requestMatchers(new AntPathRequestMatcher("/**/*.js", "GET")).permitAll()
+                        .requestMatchers(new AntPathRequestMatcher("/**/*.png", "GET")).permitAll()
+                        .requestMatchers(new AntPathRequestMatcher("/**/*.jpg", "GET")).permitAll()
+                        .requestMatchers(new AntPathRequestMatcher("/**/*.jpeg", "GET")).permitAll()
+                        .requestMatchers(new AntPathRequestMatcher("/**/*.svg", "GET")).permitAll()
+                        .requestMatchers(new AntPathRequestMatcher("/**/*.ico", "GET")).permitAll()
                         // Everything else requires authentication
                         .anyRequest().authenticated()
                 )

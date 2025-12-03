@@ -4,14 +4,90 @@ const API_BASE_URL = '';
 function checkAuthentication() {
   const jwtToken = localStorage.getItem('jwtToken');
   if (!jwtToken) {
-    // Redirect to login if not authenticated (except on auth pages)
     const currentPage = window.location.pathname;
-    if (!currentPage.includes('login') && !currentPage.includes('register') && currentPage !== '/') {
+    const isAuthPage = currentPage.includes('login') || currentPage.includes('register');
+    if (!isAuthPage) {
       window.location.href = '/login.html';
     }
     return false;
   }
   return true;
+}
+
+async function handleLogout(event) {
+  if (event) {
+    event.preventDefault();
+  }
+
+  try {
+    const jwtToken = localStorage.getItem('jwtToken');
+    if (jwtToken) {
+      await fetch('/api/auth/logout', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${jwtToken}`,
+        },
+      });
+    }
+  } catch (error) {
+    console.error('Logout error:', error);
+  } finally {
+    localStorage.removeItem('jwtToken');
+    localStorage.removeItem('refreshToken');
+    localStorage.removeItem('user');
+    localStorage.removeItem('expiresAt');
+    window.location.href = '/login.html';
+  }
+}
+
+function updateUserDisplay() {
+  const user = JSON.parse(localStorage.getItem('user') || '{}');
+  const usernameDisplay = document.getElementById('username-display');
+  const avatarDisplay = document.getElementById('avatar-display');
+
+  if (usernameDisplay) {
+    usernameDisplay.textContent = user.username || 'User';
+  }
+
+  if (avatarDisplay) {
+    const initials = user.username
+      ? user.username.substring(0, 2).toUpperCase()
+      : 'U';
+    avatarDisplay.textContent = initials;
+  }
+}
+
+function bindLogoutButton() {
+  const logoutBtn = document.getElementById('logout-btn');
+  if (!logoutBtn || logoutBtn.dataset.bound === 'true') {
+    return;
+  }
+  logoutBtn.dataset.bound = 'true';
+  logoutBtn.addEventListener('click', handleLogout);
+}
+
+function setupAuthUI() {
+  updateUserDisplay();
+  bindLogoutButton();
+}
+
+async function loadNavbar() {
+  const container = document.getElementById('navbar-container');
+  if (!container) {
+    return;
+  }
+
+  try {
+    const response = await fetch('/navbar.html', { cache: 'no-cache' });
+    if (!response.ok) {
+      throw new Error(`Navbar request failed: ${response.status}`);
+    }
+    const markup = await response.text();
+    container.innerHTML = markup;
+    setupAuthUI();
+  } catch (error) {
+    console.error('Failed to load navbar:', error);
+  }
 }
 
 // Check for token expiration
@@ -1360,7 +1436,14 @@ function formatLongDate(iso) {
 
 // --- Bootstrapping -----------------------------------------------------------
 
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", async () => {
+  const isAuthed = checkAuthentication();
+  await loadNavbar();
+
+  if (isAuthed) {
+    setupAuthUI();
+  }
+
   initApplicationsPage();
   initDetailPage();
   initCalendarPage();
