@@ -1707,4 +1707,267 @@ input:focus + .slider {
   text-align: center;
 }
 
+/* ========================================================================= */
+/* Auth Pages (Login / Register)                                            */
+/* ========================================================================= */
+
+body.auth-body {
+  margin: 0;
+  min-height: 100vh;
+  font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", sans-serif;
+  background: radial-gradient(circle at top left, #e0f2fe 0%, #eff6ff 45%, #f9fafb 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Gradient blobs / orbs in the background */
+.auth-orbit-bg {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.auth-orb {
+  position: absolute;
+  border-radius: 999px;
+  filter: blur(2px);
+  opacity: 0.25;
+}
+
+.auth-orb.orb-1 {
+  width: 320px;
+  height: 320px;
+  background: radial-gradient(circle at 30% 30%, #60a5fa 0%, #1d4ed8 60%, transparent 80%);
+  top: -80px;
+  left: -60px;
+  animation: floatOrb1 18s ease-in-out infinite alternate;
+}
+
+.auth-orb.orb-2 {
+  width: 260px;
+  height: 260px;
+  background: radial-gradient(circle at 30% 30%, #a5b4fc 0%, #6366f1 55%, transparent 80%);
+  bottom: -60px;
+  right: -40px;
+  animation: floatOrb2 22s ease-in-out infinite alternate;
+}
+
+.auth-orb.orb-3 {
+  width: 220px;
+  height: 220px;
+  background: radial-gradient(circle at 30% 30%, #bae6fd 0%, #38bdf8 55%, transparent 80%);
+  top: 40%;
+  right: 20%;
+  animation: floatOrb3 26s ease-in-out infinite alternate;
+}
+
+@keyframes floatOrb1 {
+  0%   { transform: translate3d(0, 0, 0) scale(1); }
+  100% { transform: translate3d(40px, 30px, 0) scale(1.05); }
+}
+
+@keyframes floatOrb2 {
+  0%   { transform: translate3d(0, 0, 0) scale(1); }
+  100% { transform: translate3d(-30px, -40px, 0) scale(1.08); }
+}
+
+@keyframes floatOrb3 {
+  0%   { transform: translate3d(0, 0, 0) scale(1); }
+  100% { transform: translate3d(20px, -25px, 0) scale(1.06); }
+}
+
+/* Auth layout wrapper */
+.auth-layout {
+  position: relative;
+  z-index: 1;
+  max-width: 960px;
+  width: 100%;
+  padding: 32px;
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+  gap: 32px;
+  align-items: center;
+}
+
+/* Left brand column */
+.auth-brand {
+  color: #0f172a;
+}
+
+.brand-mark {
+  width: 48px;
+  height: 48px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 16px;
+  margin-bottom: 18px;
+  box-shadow: 0 10px 30px rgba(37, 99, 235, 0.25);
+}
+
+.brand-text-block {
+  max-width: 320px;
+}
+
+.brand-title-script {
+  font-family: "Great Vibes", system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-size: 40px;
+  line-height: 1.1;
+  color: #1d4ed8;
+  margin-bottom: 6px;
+}
+
+.brand-subtitle {
+  font-size: 14px;
+  line-height: 1.6;
+  color: #4b5563;
+}
+
+/* Auth card (right column) */
+.auth-card {
+  background-color: #ffffff;
+  border-radius: 18px;
+  padding: 28px 26px 26px;
+  box-shadow: 0 20px 50px rgba(15, 23, 42, 0.16);
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  max-width: 420px;
+  width: 100%;
+  backdrop-filter: blur(12px);
+}
+
+.auth-heading {
+  margin: 0 0 6px 0;
+  font-size: 22px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.auth-subheading {
+  margin: 0 0 18px 0;
+  font-size: 13px;
+  color: #6b7280;
+}
+
+/* Messages */
+.auth-message {
+  display: none;
+  border-radius: 10px;
+  padding: 9px 10px;
+  font-size: 13px;
+  margin-bottom: 12px;
+}
+
+.auth-message-error {
+  background-color: #fef2f2;
+  color: #b91c1c;
+  border: 1px solid #fecaca;
+}
+
+.auth-message-success {
+  background-color: #ecfdf3;
+  color: #15803d;
+  border: 1px solid #bbf7d0;
+}
+
+/* Form tweaks for auth */
+.auth-form {
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.auth-form-group label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 6px;
+}
+
+/* Reuse .form-input + .modern-input from earlier, just tighten spacing */
+.auth-form-group .form-input {
+  padding: 10px 12px;
+  font-size: 14px;
+}
+
+/* Primary auth button */
+.auth-primary-btn {
+  width: 100%;
+  margin-top: 4px;
+}
+
+/* Tiny spinner inside buttons */
+.loading-spinner {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border-radius: 999px;
+  border: 2px solid rgba(255, 255, 255, 0.5);
+  border-top-color: #ffffff;
+  animation: authSpin 0.7s linear infinite;
+  margin-right: 6px;
+  vertical-align: -2px;
+}
+
+@keyframes authSpin {
+  to { transform: rotate(360deg); }
+}
+
+/* Bottom links */
+.auth-links-row {
+  margin-top: 14px;
+  font-size: 13px;
+  color: #6b7280;
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+}
+
+.auth-links-row a {
+  color: #2563eb;
+  font-weight: 500;
+}
+
+.auth-links-row a:hover {
+  text-decoration: underline;
+}
+
+/* Responsive: stack brand + card on mobile */
+@media (max-width: 768px) {
+  .auth-layout {
+    grid-template-columns: minmax(0, 1fr);
+    padding: 20px;
+    gap: 18px;
+    align-items: flex-start;
+  }
+
+  .auth-brand {
+    text-align: left;
+  }
+
+  .brand-text-block {
+    max-width: none;
+  }
+
+  .auth-card {
+    margin: 0 auto;
+  }
+
+  .auth-orb.orb-1,
+  .auth-orb.orb-2,
+  .auth-orb.orb-3 {
+    opacity: 0.2;
+  }
+}
+
+
 
