@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <title>JobTracker – Integrations</title>
+    <title>JobTracker – Settings</title>
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
@@ -36,13 +36,7 @@
             </a>
           </li>
           <li class="nav-item">
-            <a href="integrations.html" class="nav-link active">
-              <span class="icon icon-integrations"></span>
-              Integrations
-            </a>
-          </li>
-          <li class="nav-item">
-            <a href="settings.html" class="nav-link">
+            <a href="settings.html" class="nav-link active">
               <span class="icon icon-settings"></span>
               Settings
             </a>
@@ -56,7 +50,7 @@
         <main class="content">
           <div class="page-header">
             <div class="page-title-group">
-              <h1>Integrations</h1>
+              <h1>Settings</h1>
               <p>Connect your favorite tools and services</p>
             </div>
           </div>
@@ -121,66 +115,6 @@
             </div>
           </section>
 
-          <!-- OpenAI Integration -->
-          <section class="card integration-card">
-            <div class="integration-header">
-              <div class="integration-info">
-                <h3>OpenAI</h3>
-                <p class="muted">AI-powered status tracking from email natural language</p>
-              </div>
-              <label class="switch">
-                <input type="checkbox" id="openai-toggle" />
-                <span class="slider"></span>
-              </label>
-            </div>
-            <div class="integration-content" id="openai-content" style="display: none;">
-              <div class="integration-instructions">
-                <h4>Setup Instructions</h4>
-                <ol>
-                  <li>Go to <a href="https://platform.openai.com/" target="_blank" rel="noreferrer">OpenAI Platform</a></li>
-                  <li>Sign up or log in to your account</li>
-                  <li>Navigate to <strong>API Keys</strong> section</li>
-                  <li>Click <strong>Create new secret key</strong></li>
-                  <li>Copy the API key (it won't be shown again!)</li>
-                  <li>Paste it below and click "Verify & Load Models"</li>
-                </ol>
-                <p class="muted">
-                  Note: Keep your API key secure. Never share it or commit it to version control.
-                </p>
-              </div>
-
-              <div class="form-section">
-                <h4 class="form-section-title">API Configuration</h4>
-                <div class="form-group">
-                  <label for="openai-api-key">OpenAI API Key</label>
-                  <div class="input-with-button">
-                    <input
-                      type="password"
-                      id="openai-api-key"
-                      placeholder="sk-proj-..."
-                      class="form-input modern-input"
-                    />
-                    <button class="secondary-btn" id="verify-key-btn">
-                      <span id="verify-btn-text">Verify & Load Models</span>
-                    </button>
-                  </div>
-                  <small class="input-hint">Your API key is stored locally and never shared</small>
-                </div>
-
-                <div class="form-group" id="model-selection-group" style="display: none;">
-                  <label for="openai-model">Select Model</label>
-                  <select id="openai-model" class="form-input modern-input">
-                    <option value="">Loading models...</option>
-                  </select>
-                  <small class="input-hint" id="model-hint">Choose the model that best fits your needs</small>
-                </div>
-              </div>
-
-              <button class="primary-btn" id="openai-save-btn" style="display: none;">
-                <span>Save Configuration</span>
-              </button>
-            </div>
-          </section>
         </main>
       </div>
     </div>
@@ -192,28 +126,6 @@
       function validateEmail(email) {
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         return emailRegex.test(email);
-      }
-
-      function validateOpenAIKey(apiKey) {
-        // OpenAI keys start with 'sk-' or 'sk-proj-' and are at least 40 characters
-        return apiKey && (apiKey.startsWith('sk-') || apiKey.startsWith('sk-proj-')) && apiKey.length >= 40;
-      }
-
-      async function testOpenAIKey(apiKey) {
-        // Test the OpenAI API key by making a lightweight request
-        try {
-          const response = await fetch("https://api.openai.com/v1/models", {
-            method: "GET",
-            headers: {
-              "Authorization": `Bearer ${apiKey}`,
-              "Content-Type": "application/json",
-            },
-          });
-          return response.ok;
-        } catch (error) {
-          console.error("OpenAI API key validation failed:", error);
-          return false;
-        }
       }
 
       function showValidationError(inputId, message) {
@@ -249,7 +161,7 @@
       }
 
       function clearAllValidationErrors() {
-        ['openai-api-key', 'openai-model'].forEach(clearValidationError);
+        // Clear any validation errors
       }
 
       // Load existing integration settings
@@ -282,26 +194,6 @@
             document.getElementById("enable-calendar").checked = google.calendarEnabled;
           }
           
-          // Load OpenAI settings
-          if (integrations.openai) {
-            const openai = integrations.openai;
-            document.getElementById("openai-toggle").checked = openai.enabled;
-            document.getElementById("openai-content").style.display = openai.enabled ? "block" : "none";
-            document.getElementById("openai-api-key").value = openai.apiKey || "";
-            
-            // If model is saved, show the model selection
-            if (openai.model) {
-              const modelGroup = document.getElementById("model-selection-group");
-              const modelSelect = document.getElementById("openai-model");
-              const saveBtn = document.getElementById("openai-save-btn");
-              
-              modelGroup.style.display = "block";
-              saveBtn.style.display = "inline-flex";
-              
-              // Create an option for the saved model
-              modelSelect.innerHTML = `<option value="${openai.model}" selected>${openai.model}</option>`;
-            }
-          }
         } catch (error) {
           console.error("Failed to load integration settings:", error);
         }
@@ -311,7 +203,6 @@
       function setupToggleHandlers() {
         const toggles = [
           { toggle: "google-toggle", content: "google-content", integration: "google" },
-          { toggle: "openai-toggle", content: "openai-content", integration: "openai" },
         ];
 
         toggles.forEach(({ toggle, content, integration }) => {
@@ -402,187 +293,6 @@
           console.error("Failed to initiate Google connection:", error);
           alert("Failed to connect. Please try again.");
           btn.querySelector("span").textContent = "Connect Google Services";
-          btn.disabled = false;
-        }
-      });
-
-      // OpenAI API Key verification and model loading
-      document.getElementById("verify-key-btn")?.addEventListener("click", async () => {
-        clearValidationError("openai-api-key");
-        
-        const apiKey = document.getElementById("openai-api-key").value.trim();
-        const verifyBtn = document.getElementById("verify-key-btn");
-        const verifyBtnText = document.getElementById("verify-btn-text");
-        const modelSelect = document.getElementById("openai-model");
-        const modelGroup = document.getElementById("model-selection-group");
-        const saveBtn = document.getElementById("openai-save-btn");
-
-        // Validate API key
-        if (!apiKey) {
-          showValidationError("openai-api-key", "OpenAI API key is required");
-          return;
-        }
-        if (!validateOpenAIKey(apiKey)) {
-          showValidationError("openai-api-key", "Invalid API key format. Should start with 'sk-' or 'sk-proj-' and be at least 40 characters");
-          return;
-        }
-
-        // Show loading state
-        verifyBtn.disabled = true;
-        verifyBtnText.textContent = "Verifying...";
-
-        try {
-          // Fetch available models from OpenAI API
-          const response = await fetch("https://api.openai.com/v1/models", {
-            method: "GET",
-            headers: {
-              "Authorization": `Bearer ${apiKey}`,
-              "Content-Type": "application/json",
-            },
-          });
-
-          if (!response.ok) {
-            throw new Error("Invalid API key or network error");
-          }
-
-          const data = await response.json();
-          
-          // Filter for chat/completion models and sort by relevance
-          const relevantModels = data.data
-            .filter(model => {
-              const id = model.id.toLowerCase();
-              return id.includes('gpt') && !id.includes('instruct') && !id.includes('0301');
-            })
-            .sort((a, b) => {
-              // Priority order for display
-              const priority = {
-                'gpt-4': 1,
-                'gpt-4-turbo': 2,
-                'gpt-4o': 3,
-                'gpt-3.5-turbo': 4,
-              };
-              const aId = a.id;
-              const bId = b.id;
-              const aPriority = Object.entries(priority).find(([key]) => aId.startsWith(key))?.[1] || 999;
-              const bPriority = Object.entries(priority).find(([key]) => bId.startsWith(key))?.[1] || 999;
-              return aPriority - bPriority;
-            });
-
-          // Populate the select dropdown
-          modelSelect.innerHTML = "";
-          
-          if (relevantModels.length === 0) {
-            modelSelect.innerHTML = '<option value="">No models available</option>';
-          } else {
-            relevantModels.forEach((model, index) => {
-              const option = document.createElement("option");
-              option.value = model.id;
-              
-              // Add helpful descriptions
-              let description = model.id;
-              if (model.id.includes('gpt-4o')) {
-                description += ' (Latest & Most Capable)';
-              } else if (model.id.includes('gpt-4-turbo')) {
-                description += ' (Fast & Capable)';
-              } else if (model.id.includes('gpt-4') && !model.id.includes('turbo')) {
-                description += ' (High Quality)';
-              } else if (model.id.includes('gpt-3.5-turbo')) {
-                description += ' (Fast & Economical)';
-              }
-              
-              option.textContent = description;
-              if (index === 0) option.selected = true;
-              modelSelect.appendChild(option);
-            });
-          }
-
-          // Show model selection and save button
-          modelGroup.style.display = "block";
-          saveBtn.style.display = "inline-flex";
-          
-          verifyBtnText.textContent = "✓ Verified";
-          verifyBtn.classList.add("success");
-          
-          setTimeout(() => {
-            verifyBtnText.textContent = "Reload Models";
-            verifyBtn.disabled = false;
-            verifyBtn.classList.remove("success");
-          }, 2000);
-
-        } catch (error) {
-          alert("Failed to verify API key. Please check your key and try again.");
-          verifyBtnText.textContent = "Verify & Load Models";
-          verifyBtn.disabled = false;
-          console.error("OpenAI API Error:", error);
-        }
-      });
-
-      // OpenAI save configuration
-      document.getElementById("openai-save-btn")?.addEventListener("click", async () => {
-        clearAllValidationErrors();
-        
-        const apiKey = document.getElementById("openai-api-key").value.trim();
-        const model = document.getElementById("openai-model").value;
-        const toggleEnabled = document.getElementById("openai-toggle").checked;
-        
-        // Validate API key
-        if (!apiKey) {
-          showValidationError("openai-api-key", "OpenAI API key is required");
-          return;
-        }
-        if (!validateOpenAIKey(apiKey)) {
-          showValidationError("openai-api-key", "Invalid API key format");
-          return;
-        }
-
-        // Validate model selection
-        if (!model) {
-          showValidationError("openai-model", "Please select a model");
-          return;
-        }
-
-        const btn = document.getElementById("openai-save-btn");
-        btn.disabled = true;
-        btn.querySelector("span").textContent = "Validating...";
-
-        // Test API key before saving
-        const isValid = await testOpenAIKey(apiKey);
-        
-        if (!isValid) {
-          alert("Failed to validate OpenAI API key. Please check your key and try again.");
-          btn.querySelector("span").textContent = "Save Configuration";
-          btn.disabled = false;
-          return;
-        }
-
-        btn.querySelector("span").textContent = "Saving...";
-
-        try {
-          await fetchJson("/api/user/integrations", {
-            method: "PUT",
-            body: JSON.stringify({
-              openai: {
-                enabled: toggleEnabled,
-                apiKey: apiKey,
-                model: model,
-              }
-            }),
-          });
-
-          btn.querySelector("span").textContent = "✓ Saved";
-          btn.classList.add("success");
-          
-          setTimeout(() => {
-            btn.querySelector("span").textContent = "Save Configuration";
-            btn.disabled = false;
-            btn.classList.remove("success");
-          }, 2000);
-
-          alert(`OpenAI configuration saved!\nModel: ${model}`);
-        } catch (error) {
-          console.error("Failed to save OpenAI integration:", error);
-          alert("Failed to save OpenAI configuration. Please try again.");
-          btn.querySelector("span").textContent = "Save Configuration";
           btn.disabled = false;
         }
       });

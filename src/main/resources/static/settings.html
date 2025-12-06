@@ -36,12 +36,6 @@
             </a>
           </li>
           <li class="nav-item">
-            <a href="integrations.html" class="nav-link">
-              <span class="icon icon-integrations"></span>
-              Integrations
-            </a>
-          </li>
-          <li class="nav-item">
             <a href="settings.html" class="nav-link active">
               <span class="icon icon-settings"></span>
               Settings
@@ -57,38 +51,256 @@
           <div class="page-header">
             <div class="page-title-group">
               <h1>Settings</h1>
-              <p>Manage your account and preferences</p>
+              <p>Connect your favorite tools and services</p>
             </div>
           </div>
 
-          <section class="card">
-            <div style="padding: 60px 20px; text-align: center; color: #94a3b8;">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="80"
-                height="80"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="1.5"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                style="margin: 0 auto 20px;"
-              >
-                <circle cx="12" cy="12" r="3" />
-                <path
-                  d="M12 1v6m0 6v6M5.6 5.6l4.2 4.2m4.4 4.4l4.2 4.2M1 12h6m6 0h6M5.6 18.4l4.2-4.2m4.4-4.4l4.2-4.2"
-                />
-              </svg>
-              <h2 style="color: #475569; margin-bottom: 10px;">Settings Coming Soon</h2>
-              <p>This page is under construction. Check back later for account settings and preferences.</p>
+          <!-- Google Integration (Combined Gmail & Calendar) -->
+          <section class="card integration-card">
+            <div class="integration-header">
+              <div class="integration-info">
+                <div class="integration-title-row">
+                  <h3>Google</h3>
+                  <span class="integration-badge">Gmail + Calendar</span>
+                </div>
+                <p class="muted">Track job applications from email and sync deadlines to your calendar</p>
+              </div>
+              <label class="switch">
+                <input type="checkbox" id="google-toggle" />
+                <span class="slider"></span>
+              </label>
+            </div>
+            <div class="integration-content" id="google-content" style="display: none;">
+              <div id="google-connected-view" style="display: none; padding: 2rem; text-align: center; background: #f9fafb; border-radius: 8px; margin-top: 1rem;">
+                <div style="display: flex; flex-direction: column; align-items: center; gap: 1rem;">
+                  <div style="width: 48px; height: 48px; background: #d1fae5; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #059669; font-size: 24px;">✓</div>
+                  <div>
+                    <h4 style="margin: 0; color: #111827;">Connected to Google</h4>
+                    <p id="google-connected-email" style="margin: 5px 0 0; color: #6b7280; font-size: 0.9rem;"></p>
+                  </div>
+                  <button class="secondary-btn" id="google-disconnect-btn" style="border-color: #fee2e2; color: #ef4444; background: white; margin-top: 0.5rem;">Disconnect Account</button>
+                </div>
+              </div>
+
+              <div id="google-setup-view">
+                <div class="integration-instructions">
+                <h4>Setup Instructions</h4>
+                <p>Connect your Google account to enable Gmail scanning for job applications.</p>
+              </div>
+
+              <div class="form-section">
+                <h4 class="form-section-title">Enable Services</h4>
+                <div class="service-toggles">
+                  <label class="service-toggle-item">
+                    <input type="checkbox" id="enable-gmail" checked />
+                    <div class="service-toggle-content">
+                      <span class="service-toggle-label">Gmail Integration</span>
+                      <span class="service-toggle-desc">Automatically track job applications from your email</span>
+                    </div>
+                  </label>
+                  <label class="service-toggle-item">
+                    <input type="checkbox" id="enable-calendar" checked />
+                    <div class="service-toggle-content">
+                      <span class="service-toggle-label">Calendar Sync</span>
+                      <span class="service-toggle-desc">Sync interview dates and deadlines to your calendar</span>
+                    </div>
+                  </label>
+                </div>
+              </div>
+
+              <button class="primary-btn" id="google-connect-btn">
+                <span>Connect Google Services</span>
+              </button>
+              </div> <!-- End setup view -->
             </div>
           </section>
+
         </main>
       </div>
     </div>
 
     <script src="app.js"></script>
+    <script>
+      // Note: API_BASE_URL and fetchJson are already defined in app.js
+
+      function validateEmail(email) {
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        return emailRegex.test(email);
+      }
+
+      function showValidationError(inputId, message) {
+        const input = document.getElementById(inputId);
+        if (input) {
+          input.style.borderColor = '#ef4444';
+          input.focus();
+        }
+        
+        // Create or update error message
+        let errorEl = document.getElementById(`${inputId}-error`);
+        if (!errorEl) {
+          errorEl = document.createElement('small');
+          errorEl.id = `${inputId}-error`;
+          errorEl.style.color = '#ef4444';
+          errorEl.style.display = 'block';
+          errorEl.style.marginTop = '4px';
+          errorEl.style.fontSize = '0.875rem';
+          input.parentNode.appendChild(errorEl);
+        }
+        errorEl.textContent = message;
+      }
+
+      function clearValidationError(inputId) {
+        const input = document.getElementById(inputId);
+        if (input) {
+          input.style.borderColor = '';
+        }
+        const errorEl = document.getElementById(`${inputId}-error`);
+        if (errorEl) {
+          errorEl.remove();
+        }
+      }
+
+      function clearAllValidationErrors() {
+        // Clear any validation errors
+      }
+
+      // Load existing integration settings
+      async function loadIntegrationSettings() {
+        try {
+          const integrations = await fetchJson("/api/user/integrations");
+          
+          // Load Google settings
+          if (integrations.google) {
+            const google = integrations.google;
+            document.getElementById("google-toggle").checked = google.enabled;
+            document.getElementById("google-content").style.display = google.enabled ? "block" : "none";
+            
+            // Check if connected (has credentials)
+            const isConnected = google.connected; // Updated to match backend property
+            
+            const connectedView = document.getElementById("google-connected-view");
+            const setupView = document.getElementById("google-setup-view");
+            
+            if (isConnected) {
+                connectedView.style.display = "block";
+                setupView.style.display = "none";
+                document.getElementById("google-connected-email").textContent = google.email || "Connected Account";
+            } else {
+                connectedView.style.display = "none";
+                setupView.style.display = "block";
+            }
+
+            document.getElementById("enable-gmail").checked = google.gmailEnabled;
+            document.getElementById("enable-calendar").checked = google.calendarEnabled;
+          }
+          
+        } catch (error) {
+          console.error("Failed to load integration settings:", error);
+        }
+      }
+
+      // Toggle integration content visibility and save state
+      function setupToggleHandlers() {
+        const toggles = [
+          { toggle: "google-toggle", content: "google-content", integration: "google" },
+        ];
+
+        toggles.forEach(({ toggle, content, integration }) => {
+          const toggleEl = document.getElementById(toggle);
+          const contentEl = document.getElementById(content);
+
+          if (toggleEl && contentEl) {
+            toggleEl.addEventListener("change", async (e) => {
+              const isEnabled = e.target.checked;
+              contentEl.style.display = isEnabled ? "block" : "none";
+              
+              // Auto-save toggle state to backend
+              try {
+                await fetchJson("/api/user/integrations", {
+                  method: "PUT",
+                  body: JSON.stringify({
+                    [integration]: {
+                      enabled: isEnabled
+                    }
+                  }),
+                });
+                console.log(`${integration} integration ${isEnabled ? 'enabled' : 'disabled'}`);
+              } catch (error) {
+                console.error(`Failed to save ${integration} toggle state:`, error);
+              }
+            });
+          }
+        });
+      }
+
+      // Initialize toggle handlers
+      setupToggleHandlers();
+
+      // Disconnect handler
+      document.getElementById("google-disconnect-btn")?.addEventListener("click", async () => {
+        if (!confirm("Are you sure you want to disconnect Google services? This will stop email tracking.")) {
+            return;
+        }
+        
+        try {
+            await fetchJson("/api/user/integrations/google", {
+                method: "DELETE"
+            });
+            
+            // Reload settings to update UI
+            loadIntegrationSettings();
+        } catch (error) {
+            console.error("Failed to disconnect:", error);
+            alert("Failed to disconnect. Please try again.");
+        }
+      });
+
+      // Google connection handler
+      document.getElementById("google-connect-btn")?.addEventListener("click", async () => {
+        clearAllValidationErrors();
+        
+        const gmailEnabled = document.getElementById("enable-gmail").checked;
+        const calendarEnabled = document.getElementById("enable-calendar").checked;
+        const toggleEnabled = document.getElementById("google-toggle").checked;
+
+        // Check if at least one service is enabled
+        if (!gmailEnabled && !calendarEnabled) {
+          alert("Please enable at least one service (Gmail or Calendar)");
+          return;
+        }
+
+        const btn = document.getElementById("google-connect-btn");
+        btn.disabled = true;
+        btn.querySelector("span").textContent = "Connecting...";
+
+        try {
+          // Save preferences first
+          await fetchJson("/api/user/integrations", {
+            method: "PUT",
+            body: JSON.stringify({
+              google: {
+                enabled: toggleEnabled,
+                gmailEnabled: gmailEnabled,
+                calendarEnabled: calendarEnabled,
+              }
+            }),
+          });
+
+          // Redirect to OAuth flow
+          window.location.href = "/api/oauth/google/authorize";
+          
+        } catch (error) {
+          console.error("Failed to initiate Google connection:", error);
+          alert("Failed to connect. Please try again.");
+          btn.querySelector("span").textContent = "Connect Google Services";
+          btn.disabled = false;
+        }
+      });
+
+      // Load settings on page load
+      document.addEventListener("DOMContentLoaded", () => {
+        loadIntegrationSettings();
+      });
+    </script>
   </body>
 </html>
-
