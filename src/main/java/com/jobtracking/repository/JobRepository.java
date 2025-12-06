@@ -1,6 +1,6 @@
-package com.jobtracking.jobs.repository;
+package com.jobtracking.repository;
 
-import com.jobtracking.jobs.model.Job;
+import com.jobtracking.model.Job;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 

@@ -1,4 +1,4 @@
-package com.jobtracking.jobs.model;
+package com.jobtracking.model;
 
 import jakarta.persistence.*;
 

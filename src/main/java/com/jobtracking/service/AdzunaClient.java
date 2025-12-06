@@ -1,9 +1,9 @@
-package com.jobtracking.jobs.service;
+package com.jobtracking.service;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.jobtracking.jobs.model.Job;
-import com.jobtracking.jobs.repository.JobRepository;
+import com.jobtracking.model.Job;
+import com.jobtracking.repository.JobRepository;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
@@ -79,12 +79,24 @@ public class AdzunaClient {
             return null;
         }
         if (min != null && max != null) {
-            return String.format("%.0f - %.0f", min, max);
+            // If min and max are the same, just show one
+            if (min.equals(max)) {
+                return formatK(min);
+            }
+            return String.format("%s - %s", formatK(min), formatK(max));
         }
         if (min != null) {
-            return String.format("From %.0f", min);
+            return String.format("From %s", formatK(min));
         }
-        return String.format("Up to %.0f", max);
+        return String.format("Up to %s", formatK(max));
+    }
+
+    private String formatK(Double amount) {
+        if (amount == null) return "";
+        if (amount >= 1000) {
+            return String.format("%.0fk", amount / 1000);
+        }
+        return String.format("%.0f", amount);
     }
 
     // DTOs for parsing Adzuna JSON

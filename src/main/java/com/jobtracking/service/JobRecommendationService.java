@@ -1,8 +1,8 @@
-package com.jobtracking.jobs.service;
+package com.jobtracking.service;
 
-import com.jobtracking.jobs.dto.JobDto;
-import com.jobtracking.jobs.model.Job;
-import com.jobtracking.jobs.repository.JobRepository;
+import com.jobtracking.dto.JobDto;
+import com.jobtracking.model.Job;
+import com.jobtracking.repository.JobRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
@@ -78,6 +78,10 @@ public class JobRecommendationService {
             return scored.subList(0, limit);
         }
         return scored;
+    }
+
+    public List<Job> getAllJobs() {
+        return jobRepository.findAll();
     }
 
     private String buildSearchText(Job job) {

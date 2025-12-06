@@ -1,44 +1,71 @@
 package com.jobtracking.controller;
 
-import org.springframework.web.bind.annotation.CrossOrigin;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import com.jobtracking.dto.JobDto;
+import com.jobtracking.dto.JobRecommendationRequest;
+import com.jobtracking.model.Job;
+import com.jobtracking.service.JobRecommendationService;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/jobs")
 @CrossOrigin(origins = "*")
 public class JobController {
 
-    // Hardcoded mock data to match original app.py
+    private final JobRecommendationService recommendationService;
+
+    public JobController(JobRecommendationService recommendationService) {
+        this.recommendationService = recommendationService;
+    }
+
+    // Fetch all jobs (from DB)
     @GetMapping
     public List<Map<String, Object>> getJobs() {
-        List<Map<String, Object>> jobs = new ArrayList<>();
-        
-        jobs.add(createJob(1, "Frontend Developer", "Tech Corp", "$100k - $140k", "Full-time", "San Francisco, CA"));
-        jobs.add(createJob(2, "Backend Engineer", "Data Systems", "$120k - $160k", "Full-time", "Remote"));
-        jobs.add(createJob(3, "Product Designer", "Creative Solutions", "$90k - $130k", "Contract", "New York, NY"));
-        jobs.add(createJob(4, "DevOps Engineer", "Cloud Infra", "$130k - $170k", "Full-time", "Austin, TX"));
-        
-        return jobs;
+        List<Job> jobs = recommendationService.getAllJobs();
+        return jobs.stream().map(this::convertToMap).collect(Collectors.toList());
     }
-    
-    private Map<String, Object> createJob(int id, String title, String company, String salary, String type, String location) {
-        Map<String, Object> job = new HashMap<>();
-        job.put("id", id);
-        job.put("title", title);
-        job.put("company", company);
-        job.put("salary", salary);
-        job.put("job_type", type);
-        job.put("location", location);
-        job.put("description", "Description for " + title);
-        job.put("job_link", "https://example.com/jobs/" + id);
-        return job;
+
+    // Trigger Adzuna fetch
+    // Example: POST /api/jobs/fetch?query=software&location=los+angeles
+    @PostMapping("/fetch")
+    public ResponseEntity<String> fetchJobs(
+            @RequestParam(defaultValue = "software engineer") String query,
+            @RequestParam(defaultValue = "United States") String location) {
+
+        int count = recommendationService.refreshJobs(query, location);
+        return ResponseEntity.ok("Fetched and saved " + count + " jobs");
+    }
+
+    // Get recommendations
+    // Example: POST /api/jobs/recommendations?limit=20
+    // Body: { "skills": ["python", "react", "backend"] }
+    @PostMapping("/recommendations")
+    public ResponseEntity<List<JobDto>> getRecommendations(
+            @RequestBody JobRecommendationRequest request,
+            @RequestParam(defaultValue = "20") int limit) {
+
+        List<JobDto> results =
+                recommendationService.recommendJobs(request.getSkills(), limit);
+        return ResponseEntity.ok(results);
+    }
+
+    private Map<String, Object> convertToMap(Job job) {
+        Map<String, Object> map = new HashMap<>();
+        map.put("id", job.getId());
+        map.put("title", job.getTitle());
+        map.put("company", job.getCompany());
+        map.put("salary", job.getSalary());
+        // job_type is not in Adzuna model currently, defaulting to empty or "Full-time" if you want
+        map.put("job_type", "Full-time"); 
+        map.put("location", job.getLocation());
+        map.put("description", job.getDescription());
+        map.put("job_link", job.getExternalUrl());
+        return map;
     }
 }
-
