@@ -1,5 +1,12 @@
 const API_BASE_URL = '';
 
+// Initialize theme immediately to prevent flash
+(function initTheme() {
+  const savedTheme = localStorage.getItem('theme') || 
+    (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+  document.documentElement.setAttribute('data-theme', savedTheme);
+})();
+
 // Check if user is authenticated
 function checkAuthentication() {
   const jwtToken = localStorage.getItem('jwtToken');

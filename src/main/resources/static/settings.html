@@ -3,6 +3,13 @@
   <head>
     <meta charset="UTF-8" />
     <title>JobTracker – Settings</title>
+    <script>
+      // Apply theme immediately to prevent flash
+      (function() {
+        const theme = localStorage.getItem('theme') || 'light';
+        document.documentElement.setAttribute('data-theme', theme);
+      })();
+    </script>
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
@@ -55,6 +62,24 @@
             </div>
           </div>
 
+          <!-- Appearance Settings -->
+          <section class="card integration-card">
+            <div class="integration-header" style="border-bottom: none; padding-bottom: 0;">
+              <div class="integration-info">
+                <h3>Appearance</h3>
+                <p class="muted">Toggle between light and dark mode</p>
+              </div>
+              <div class="theme-toggle-container">
+                <span class="theme-icon" id="sun-icon">☀️</span>
+                <label class="switch">
+                  <input type="checkbox" id="theme-toggle" />
+                  <span class="slider"></span>
+                </label>
+                <span class="theme-icon" id="moon-icon">🌙</span>
+              </div>
+            </div>
+          </section>
+
           <!-- Google Integration (Combined Gmail & Calendar) -->
           <section class="card integration-card">
             <div class="integration-header">
@@ -71,14 +96,14 @@
               </label>
             </div>
             <div class="integration-content" id="google-content" style="display: none;">
-              <div id="google-connected-view" style="display: none; padding: 2rem; text-align: center; background: #f9fafb; border-radius: 8px; margin-top: 1rem;">
-                <div style="display: flex; flex-direction: column; align-items: center; gap: 1rem;">
-                  <div style="width: 48px; height: 48px; background: #d1fae5; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #059669; font-size: 24px;">✓</div>
+              <div id="google-connected-view" class="google-connected-view" style="display: none;">
+                <div class="google-connected-inner">
+                  <div class="google-connected-icon">✓</div>
                   <div>
-                    <h4 style="margin: 0; color: #111827;">Connected to Google</h4>
-                    <p id="google-connected-email" style="margin: 5px 0 0; color: #6b7280; font-size: 0.9rem;"></p>
+                    <h4 class="google-connected-title">Connected to Google</h4>
+                    <p id="google-connected-email" class="google-connected-email"></p>
                   </div>
-                  <button class="secondary-btn" id="google-disconnect-btn" style="border-color: #fee2e2; color: #ef4444; background: white; margin-top: 0.5rem;">Disconnect Account</button>
+                  <button class="secondary-btn google-disconnect-btn" id="google-disconnect-btn">Disconnect Account</button>
                 </div>
               </div>
 
@@ -297,9 +322,49 @@
         }
       });
 
+      // Theme toggle functionality
+      function initThemeSettings() {
+        const savedTheme = localStorage.getItem('theme') || 'light';
+        const themeToggle = document.getElementById('theme-toggle');
+        const sunIcon = document.getElementById('sun-icon');
+        const moonIcon = document.getElementById('moon-icon');
+        
+        // Set initial state
+        updateThemeUI(savedTheme);
+        
+        // Toggle switch handler
+        themeToggle.addEventListener('change', (e) => {
+          const theme = e.target.checked ? 'dark' : 'light';
+          applyTheme(theme);
+        });
+      }
+      
+      function updateThemeUI(theme) {
+        const themeToggle = document.getElementById('theme-toggle');
+        const sunIcon = document.getElementById('sun-icon');
+        const moonIcon = document.getElementById('moon-icon');
+        
+        if (theme === 'dark') {
+          themeToggle.checked = true;
+          sunIcon.classList.remove('active');
+          moonIcon.classList.add('active');
+        } else {
+          themeToggle.checked = false;
+          sunIcon.classList.add('active');
+          moonIcon.classList.remove('active');
+        }
+      }
+      
+      function applyTheme(theme) {
+        document.documentElement.setAttribute('data-theme', theme);
+        localStorage.setItem('theme', theme);
+        updateThemeUI(theme);
+      }
+
       // Load settings on page load
       document.addEventListener("DOMContentLoaded", () => {
         loadIntegrationSettings();
+        initThemeSettings();
       });
     </script>
   </body>
