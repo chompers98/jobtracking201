@@ -104,7 +104,8 @@ public class AuthController {
     }
 
     // ==================== GOOGLE OAUTH ENDPOINTS ====================
-
+    
+    @GetMapping("/oauth/google/authorize")  // ← CRITICAL: This was missing!
     public void googleAuthorize(HttpServletResponse response) throws Exception {
         GoogleAuthorizationCodeFlow flow = getFlow();
         String authorizationUrl = flow.newAuthorizationUrl()
@@ -119,15 +120,15 @@ public class AuthController {
         GoogleTokenResponse tokenResponse = flow.newTokenRequest(code)
                 .setRedirectUri(CALLBACK_URI)
                 .execute();
-        
+
         // Store credentials using the DataStoreFactory configured in getFlow()
         // In this case, it stores in 'tokens' directory
         flow.createAndStoreCredential(tokenResponse, "user");
-        
+
         // Update integration status
         googleIntegration.put("connected", true);
         googleIntegration.put("enabled", true);
-        
+
         // Redirect back to frontend
         response.sendRedirect("/integrations.html");
     }

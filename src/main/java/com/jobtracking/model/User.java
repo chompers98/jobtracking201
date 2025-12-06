@@ -62,6 +62,16 @@ public class User {
         this.role = role;
     }
 
+    @Column(name = "timezone")
+    private String timezone; // User's timezone (e.g., "America/Los_Angeles")
+
+    public String getTimezone() {
+        return timezone;
+    }
+
+    public void setTimezone(String timezone) {
+        this.timezone = timezone;
+    }
 
     @Column(name = "created_at")
     private LocalDateTime createdAt;
@@ -75,6 +85,9 @@ public class User {
         updatedAt = LocalDateTime.now();
         if (role == null) {
             role = "USER";
+        }
+        if (timezone == null) {
+            timezone = "America/Los_Angeles"; // Default to PST
         }
     }
 

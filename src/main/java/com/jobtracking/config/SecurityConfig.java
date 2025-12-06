@@ -55,7 +55,7 @@ public class SecurityConfig {
     public JwtAuthenticationFilter jwtAuthenticationFilter() {
         return new JwtAuthenticationFilter();
     }
-
+    
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
@@ -63,13 +63,16 @@ public class SecurityConfig {
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(authz -> authz
-                        // Protected endpoints first
-                        .requestMatchers("/api/apps/**", "/api/auth/logout", "/api/user/**").authenticated()
-                        // Public auth endpoints
+                        // PUBLIC ENDPOINTS FIRST - Order matters!
+                        // OAuth endpoints (MUST be before authenticated rules)
+                        .requestMatchers("/api/oauth/**").permitAll()
+                        .requestMatchers("/oauth2/**").permitAll()
+
+                        // Auth endpoints
                         .requestMatchers("/api/auth/register", "/api/auth/login").permitAll()
-                        .requestMatchers("/api/oauth/google/**").permitAll()
+
+                        // Static resources
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                        // Public static resources
                         .requestMatchers(PathRequest.toStaticResources().atCommonLocations()).permitAll()
                         .requestMatchers(new AntPathRequestMatcher("/", "GET")).permitAll()
                         .requestMatchers(new AntPathRequestMatcher("/**/*.html", "GET")).permitAll()
@@ -80,6 +83,10 @@ public class SecurityConfig {
                         .requestMatchers(new AntPathRequestMatcher("/**/*.jpeg", "GET")).permitAll()
                         .requestMatchers(new AntPathRequestMatcher("/**/*.svg", "GET")).permitAll()
                         .requestMatchers(new AntPathRequestMatcher("/**/*.ico", "GET")).permitAll()
+
+                        // PROTECTED ENDPOINTS LAST
+                        .requestMatchers("/api/apps/**", "/api/auth/logout", "/api/user/**").authenticated()
+
                         // Everything else requires authentication
                         .anyRequest().authenticated()
                 )

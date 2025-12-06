@@ -7,7 +7,15 @@ import java.util.List;
 
 @Repository
 public interface ApplicationRepository extends JpaRepository<Application, Long> {
-    // Custom query to find by company name (case insensitive for better matching)
+    // Find by company name (case insensitive)
     List<Application> findByCompanyContainingIgnoreCase(String company);
-}
 
+    // Find all applications for a specific company
+    List<Application> findAllByCompany(String company);
+
+    // Find specific application by company + title combo (for duplicate detection)
+    Application findByCompanyAndTitle(String company, String title);
+
+    // Find by job link (optional - for future enhancement)
+    Application findByJobLink(String jobLink);
+}

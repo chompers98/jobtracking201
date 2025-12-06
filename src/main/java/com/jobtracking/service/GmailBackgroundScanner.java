@@ -39,13 +39,16 @@ public class GmailBackgroundScanner {
     private final ApplicationRepository applicationRepository;
     private final EmailParserService emailParserService;
     private final EmailSyncStateRepository emailSyncStateRepository;
+    private final LLMEmailParserService llmEmailParserService;
 
     public GmailBackgroundScanner(ApplicationRepository applicationRepository,
                                   EmailParserService emailParserService,
-                                  EmailSyncStateRepository emailSyncStateRepository) {
+                                  EmailSyncStateRepository emailSyncStateRepository,
+                                  LLMEmailParserService llmEmailParserService) {
         this.applicationRepository = applicationRepository;
         this.emailParserService = emailParserService;
         this.emailSyncStateRepository = emailSyncStateRepository;
+        this.llmEmailParserService = llmEmailParserService;
     }
 
     private Gmail getGmailService() throws Exception {
@@ -70,8 +73,8 @@ public class GmailBackgroundScanner {
 
         if (credential != null &&
                 (credential.getRefreshToken() != null ||
-                 credential.getExpiresInSeconds() == null ||
-                 credential.getExpiresInSeconds() > 60)) {
+                        credential.getExpiresInSeconds() == null ||
+                        credential.getExpiresInSeconds() > 60)) {
             return new Gmail.Builder(HTTP_TRANSPORT, JSON_FACTORY, credential)
                     .setApplicationName(APPLICATION_NAME)
                     .build();
@@ -153,7 +156,13 @@ public class GmailBackgroundScanner {
                 String newStatus = emailParserService.determineStatus(subject, body);
 
                 if (newStatus != null) {
-                    updateApplication(sender, subject, newStatus);
+                    // If status is "APPLIED", try to create new application
+                    if ("APPLIED".equals(newStatus)) {
+                        createApplicationFromEmail(subject, body, sender);
+                    } else {
+                        // For other statuses, update existing application
+                        updateExistingApplication(sender, subject, body, newStatus);
+                    }
                 }
 
                 // Track the newest internalDate we've seen this run
@@ -173,26 +182,117 @@ public class GmailBackgroundScanner {
         }
     }
 
-    private void updateApplication(String sender, String subject, String newStatus) {
-        List<Application> allApps = applicationRepository.findAll();
-        String senderLower = sender == null ? "" : sender.toLowerCase();
-        String subjectLower = subject == null ? "" : subject.toLowerCase();
+    /**
+     * Create a new application from email (when status = APPLIED)
+     * Uses regex + LLM fallback for company/title extraction
+     */
+    private void createApplicationFromEmail(String subject, String body, String sender) {
+        try {
+            // Step 1: Extract company and job title using regex
+            String company = emailParserService.extractCompany(sender, subject, body);
+            String jobTitle = emailParserService.extractJobTitle(subject, body);
 
-        for (Application app : allApps) {
-            if (app.getCompany() == null) continue;
+            // Step 2: If regex fails, try LLM enhancement
+            if (("Unknown Company".equals(company) || "Unknown Position".equals(jobTitle))
+                    && llmEmailParserService.isConfigured()) {
 
-            String company = app.getCompany().toLowerCase();
-            if (senderLower.contains(company) || subjectLower.contains(company)) {
-                if (!newStatus.equals(app.getStatus())) {
-                    System.out.println("Updating " + app.getCompany() + " status to " + newStatus);
-                    String existingNotes = app.getNotes() == null ? "" : app.getNotes();
-                    String autoNote = "\n[Auto-Update " + LocalDate.now() + "] Status: " + newStatus;
-                    app.setStatus(newStatus);
-                    app.setNotes(existingNotes + autoNote);
-                    applicationRepository.save(app);
+                System.out.println("[GmailScanner] Regex extraction incomplete, trying LLM...");
+                String[] llmResult = llmEmailParserService.extractCompanyAndTitle(sender, subject, body);
+
+                if (llmResult[0] != null && !"Unknown Company".equals(company)) {
+                    company = llmResult[0];
                 }
-                return; // stop after first matching application
+                if (llmResult[1] != null && !"Unknown Position".equals(jobTitle)) {
+                    jobTitle = llmResult[1];
+                }
             }
+
+            // Step 3: Check for duplicate (company + title combo)
+            Application existing = applicationRepository.findByCompanyAndTitle(company, jobTitle);
+
+            if (existing != null) {
+                System.out.println("[GmailScanner] Application already exists for " +
+                        company + " - " + jobTitle + ", skipping creation");
+                return;
+            }
+
+            // Step 4: Create new application
+            Application application = new Application();
+            application.setCompany(company);
+            application.setTitle(jobTitle);
+            application.setStatus("APPLIED");
+            application.setCreatedAt(LocalDate.now());
+            application.setAppliedAt(LocalDate.now());
+            application.setNotes(
+                    "[Auto-created from email on " + LocalDate.now() + "]\n" +
+                            "Sender: " + sender + "\n" +
+                            "Subject: " + subject
+            );
+
+            applicationRepository.save(application);
+            System.out.println("[GmailScanner] ✅ Created new application: " + company + " - " + jobTitle);
+
+        } catch (Exception e) {
+            System.err.println("[GmailScanner] Error creating application: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+
+    /**
+     * Update existing application based on email (for INTERVIEW, OFFER, REJECTED)
+     * Uses company + title matching with fallback to company-only
+     */
+    private void updateExistingApplication(String sender, String subject, String body, String newStatus) {
+        try {
+            // Extract company and job title
+            String company = emailParserService.extractCompany(sender, subject, body);
+            String jobTitle = emailParserService.extractJobTitle(subject, body);
+
+            // Try LLM if regex fails
+            if (("Unknown Company".equals(company) || "Unknown Position".equals(jobTitle))
+                    && llmEmailParserService.isConfigured()) {
+
+                String[] llmResult = llmEmailParserService.extractCompanyAndTitle(sender, subject, body);
+                if (llmResult[0] != null) company = llmResult[0];
+                if (llmResult[1] != null) jobTitle = llmResult[1];
+            }
+
+            Application application = null;
+
+            // Strategy 1: Try exact match (company + title)
+            if (jobTitle != null && !jobTitle.equals("Unknown Position")) {
+                application = applicationRepository.findByCompanyAndTitle(company, jobTitle);
+            }
+
+            // Strategy 2: Fallback to any application from this company
+            if (application == null) {
+                List<Application> companyApps = applicationRepository.findAllByCompany(company);
+                if (!companyApps.isEmpty()) {
+                    application = companyApps.get(0);
+                    System.out.println("[GmailScanner] ⚠️ No exact match found, updating first application for " + company);
+                }
+            }
+
+            // Update if found
+            if (application != null) {
+                if (!newStatus.equals(application.getStatus())) {
+                    System.out.println("[GmailScanner] Updating " + application.getCompany() +
+                            " - " + application.getTitle() + " status to " + newStatus);
+
+                    String existingNotes = application.getNotes() == null ? "" : application.getNotes();
+                    String autoNote = "\n[Auto-Update " + LocalDate.now() + "] Status: " + newStatus;
+
+                    application.setStatus(newStatus);
+                    application.setNotes(existingNotes + autoNote);
+                    applicationRepository.save(application);
+                }
+            } else {
+                System.out.println("[GmailScanner] ⚠️ No matching application found for: " + company);
+            }
+
+        } catch (Exception e) {
+            System.err.println("[GmailScanner] Error updating application: " + e.getMessage());
+            e.printStackTrace();
         }
     }
 
