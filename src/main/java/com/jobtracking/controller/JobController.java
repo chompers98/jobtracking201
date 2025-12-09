@@ -56,9 +56,11 @@ public class JobController {
         if (auth == null || !auth.isAuthenticated()) {
             throw new RuntimeException("User not authenticated");
         }
-        String username = auth.getName();
-        return userRepository.findByUsername(username)
-                .orElseThrow(() -> new RuntimeException("User not found: " + username));
+        String principal = auth.getName();
+        // Try email first (JWT stores email), then fall back to username
+        return userRepository.findByEmail(principal)
+                .or(() -> userRepository.findByUsername(principal))
+                .orElseThrow(() -> new RuntimeException("User not found: " + principal));
     }
 
     // Fetch all jobs (from DB), excluding jobs the user has already applied to
