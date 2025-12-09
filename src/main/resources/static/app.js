@@ -391,9 +391,9 @@ async function initDetailPage() {
       if (allTimelineItems.length > 0) {
         allTimelineItems
           .sort((a, b) => {
-            const dateA = a.trigger_at;
-            const dateB = b.trigger_at;
-            return new Date(dateB) - new Date(dateA);
+            const dateA = parseLocalDate(a.trigger_at);
+            const dateB = parseLocalDate(b.trigger_at);
+            return dateB - dateA;
           })
           .forEach((reminder, index) => {
             // Map kind to color class
@@ -1347,10 +1347,10 @@ function renderUpcomingEvents(events) {
   // Filter future events and sort by date
   const upcomingEvents = events
     .filter((event) => {
-      const eventDate = new Date(event.date);
-      return eventDate >= now;
+      const eventDate = parseLocalDate(event.date);
+      return eventDate && eventDate >= now;
     })
-    .sort((a, b) => new Date(a.date) - new Date(b.date))
+    .sort((a, b) => parseLocalDate(a.date) - parseLocalDate(b.date))
     .slice(0, 3); // Get next 3 events
 
   if (upcomingEvents.length === 0) {
@@ -1364,7 +1364,7 @@ function renderUpcomingEvents(events) {
 
   upcomingList.innerHTML = "";
   upcomingEvents.forEach((event) => {
-    const eventDate = new Date(event.date);
+    const eventDate = parseLocalDate(event.date);
     const isToday = isSameDay(eventDate, new Date());
     const daysUntil = Math.ceil((eventDate - now) / (1000 * 60 * 60 * 24));
 
@@ -1429,18 +1429,35 @@ function getEventIcon(color) {
   return icons[color] || icons.blue;
 }
 
+/**
+ * Parse a date string as LOCAL time (not UTC).
+ * Fixes the timezone bug where "2024-12-10" becomes Dec 9 in PST.
+ */
+function parseLocalDate(dateStr) {
+  if (!dateStr) return null;
+  // If it's already a Date object, return it
+  if (dateStr instanceof Date) return dateStr;
+  // Handle "YYYY-MM-DD" format - parse as local time
+  if (typeof dateStr === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+    const [year, month, day] = dateStr.split('-').map(Number);
+    return new Date(year, month - 1, day); // month is 0-indexed
+  }
+  // Fallback to regular Date parsing
+  return new Date(dateStr);
+}
+
 function formatShortDate(iso) {
   if (!iso) return "-";
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return iso;
+  const d = parseLocalDate(iso);
+  if (!d || Number.isNaN(d.getTime())) return iso;
   const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
   return `${monthNames[d.getMonth()]} ${String(d.getDate()).padStart(2, "0")}`;
 }
 
 function formatLongDate(iso) {
   if (!iso) return "";
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return iso;
+  const d = parseLocalDate(iso);
+  if (!d || Number.isNaN(d.getTime())) return iso;
   const monthNames = ["January","February","March","April","May","June","July","August","September","October","November","December"];
   return `${monthNames[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`;
 }
