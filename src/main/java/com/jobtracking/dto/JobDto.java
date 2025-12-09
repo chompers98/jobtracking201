@@ -1,8 +1,10 @@
 package com.jobtracking.dto;
 
+import java.util.UUID;
+
 public class JobDto {
 
-    private Long id;
+    private UUID id;
     private String title;
     private String company;
     private String salary;
@@ -14,7 +16,7 @@ public class JobDto {
     public JobDto() {
     }
 
-    public JobDto(Long id,
+    public JobDto(UUID id,
                   String title,
                   String company,
                   String salary,
@@ -32,7 +34,7 @@ public class JobDto {
         this.score = score;
     }
 
-    public Long getId() {
+    public UUID getId() {
         return id;
     }
 

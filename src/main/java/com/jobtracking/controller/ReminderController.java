@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/reminders")
@@ -47,14 +48,14 @@ public class ReminderController {
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<Reminder> getReminder(@PathVariable Long id) {
+    public ResponseEntity<Reminder> getReminder(@PathVariable UUID id) {
         return reminderRepository.findById(id)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<Reminder> updateReminder(@PathVariable Long id, @RequestBody Reminder details) {
+    public ResponseEntity<Reminder> updateReminder(@PathVariable UUID id, @RequestBody Reminder details) {
         return reminderRepository.findById(id)
                 .map(reminder -> {
                     reminder.setTitle(details.getTitle());
@@ -76,7 +77,7 @@ public class ReminderController {
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<?> deleteReminder(@PathVariable Long id) {
+    public ResponseEntity<?> deleteReminder(@PathVariable UUID id) {
         return reminderRepository.findById(id)
                 .map(reminder -> {
                     reminderRepository.delete(reminder);
@@ -92,7 +93,7 @@ public class ReminderController {
      */
     @PostMapping("/{id}/calendar")
     public ResponseEntity<CalendarEventResponse> createCalendarEvent(
-            @PathVariable Long id,
+            @PathVariable UUID id,
             @RequestBody CalendarEventRequest request) {
 
         try {

@@ -1,22 +1,26 @@
 package com.jobtracking.model;
 
 import jakarta.persistence.*;
+import org.hibernate.annotations.GenericGenerator;
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.util.UUID;
 
 @Entity
 @Table(name = "reminders")
 public class Reminder {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    @GeneratedValue(generator = "UUID")
+    @GenericGenerator(name = "UUID", strategy = "org.hibernate.id.UUIDGenerator")
+    @Column(name = "id", updatable = false, nullable = false, columnDefinition = "uuid")
+    private UUID id;
 
     private String kind; // DEADLINE, INTERVIEW, FOLLOWUP
     private String title;
     
-    @Column(name = "application_id")
-    private Long applicationId;
+    @Column(name = "application_id", columnDefinition = "uuid")
+    private UUID applicationId;
     
     @Column(columnDefinition = "TEXT")
     private String notes;
@@ -50,8 +54,8 @@ public class Reminder {
     public Reminder() {}
 
     // Getters and Setters
-    public Long getId() { return id; }
-    public void setId(Long id) { this.id = id; }
+    public UUID getId() { return id; }
+    public void setId(UUID id) { this.id = id; }
     
     public String getKind() { return kind; }
     public void setKind(String kind) { this.kind = kind; }
@@ -59,8 +63,8 @@ public class Reminder {
     public String getTitle() { return title; }
     public void setTitle(String title) { this.title = title; }
     
-    public Long getApplicationId() { return applicationId; }
-    public void setApplicationId(Long applicationId) { this.applicationId = applicationId; }
+    public UUID getApplicationId() { return applicationId; }
+    public void setApplicationId(UUID applicationId) { this.applicationId = applicationId; }
     
     public String getNotes() { return notes; }
     public void setNotes(String notes) { this.notes = notes; }

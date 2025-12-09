@@ -49,6 +49,7 @@ public class AuthController {
         googleIntegration.put("calendarEnabled", true);
         googleIntegration.put("email", "");
         googleIntegration.put("connected", false);
+        googleIntegration.put("connectedUserId", null); // Track which user connected Google
     }
 
     // ==================== USER AUTHENTICATION ENDPOINTS ====================

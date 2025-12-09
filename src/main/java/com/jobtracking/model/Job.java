@@ -1,14 +1,18 @@
 package com.jobtracking.model;
 
 import jakarta.persistence.*;
+import org.hibernate.annotations.GenericGenerator;
+import java.util.UUID;
 
 @Entity
 @Table(name = "jobs")
 public class Job {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    @GeneratedValue(generator = "UUID")
+    @GenericGenerator(name = "UUID", strategy = "org.hibernate.id.UUIDGenerator")
+    @Column(name = "id", updatable = false, nullable = false, columnDefinition = "uuid")
+    private UUID id;
 
     @Column(nullable = false)
     private String title;
@@ -45,8 +49,12 @@ public class Job {
         this.externalUrl = externalUrl;
     }
 
-    public Long getId() {
+    public UUID getId() {
         return id;
+    }
+    
+    public void setId(UUID id) {
+        this.id = id;
     }
 
     public String getTitle() {

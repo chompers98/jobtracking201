@@ -16,8 +16,10 @@ import com.google.api.services.gmail.model.Message;
 import com.jobtracking.controller.AuthController;
 import com.jobtracking.model.Application;
 import com.jobtracking.model.EmailSyncState;
+import com.jobtracking.model.User;
 import com.jobtracking.repository.ApplicationRepository;
 import com.jobtracking.repository.EmailSyncStateRepository;
+import com.jobtracking.repository.UserRepository;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
@@ -27,6 +29,7 @@ import java.io.InputStreamReader;
 import java.time.LocalDate;
 import java.util.Collections;
 import java.util.List;
+import java.util.UUID;
 
 @Service
 public class GmailBackgroundScanner {
@@ -40,15 +43,18 @@ public class GmailBackgroundScanner {
     private final EmailParserService emailParserService;
     private final EmailSyncStateRepository emailSyncStateRepository;
     private final LLMEmailParserService llmEmailParserService;
+    private final UserRepository userRepository;
 
     public GmailBackgroundScanner(ApplicationRepository applicationRepository,
                                   EmailParserService emailParserService,
                                   EmailSyncStateRepository emailSyncStateRepository,
-                                  LLMEmailParserService llmEmailParserService) {
+                                  LLMEmailParserService llmEmailParserService,
+                                  UserRepository userRepository) {
         this.applicationRepository = applicationRepository;
         this.emailParserService = emailParserService;
         this.emailSyncStateRepository = emailSyncStateRepository;
         this.llmEmailParserService = llmEmailParserService;
+        this.userRepository = userRepository;
     }
 
     private Gmail getGmailService() throws Exception {
@@ -85,25 +91,47 @@ public class GmailBackgroundScanner {
     /**
      * Background email scanner.
      * Runs every 60 seconds, but only processes NEW emails
-     * using lastProcessedInternalDate from EmailSyncState.
+     * using lastProcessedInternalDate from EmailSyncState (per user).
      */
     @Scheduled(fixedRate = 60000) // Run every 60 seconds
     public void scanInbox() {
         // Don't scan if not connected/enabled
         Boolean enabled = (Boolean) AuthController.googleIntegration.get("enabled");
         Boolean connected = (Boolean) AuthController.googleIntegration.get("connected");
+        UUID connectedUserId = (UUID) AuthController.googleIntegration.get("connectedUserId");
 
         if (enabled == null || !enabled || connected == null || !connected) {
             return;
         }
 
+        // Get the user who connected Google
+        User user = null;
+        if (connectedUserId != null) {
+            user = userRepository.findById(connectedUserId).orElse(null);
+        }
+        
+        // If no connected user, try to get the first user as fallback
+        if (user == null) {
+            List<User> allUsers = userRepository.findAll();
+            if (!allUsers.isEmpty()) {
+                user = allUsers.get(0);
+                System.out.println("[GmailScanner] No connected user ID found, using first user: " + user.getUsername());
+            } else {
+                System.out.println("[GmailScanner] No users found in database, skipping email scan");
+                return;
+            }
+        }
+
+        final User scanUser = user; // Make effectively final for lambda use
+
         try {
-            // 1) Load or initialize sync state (id = 1)
-            EmailSyncState state = emailSyncStateRepository.findById(1L).orElseGet(() -> {
-                EmailSyncState s = new EmailSyncState();
-                s.setLastProcessedInternalDate(0L);
-                return emailSyncStateRepository.save(s);
-            });
+            // 1) Load or initialize sync state for this user
+            EmailSyncState state = emailSyncStateRepository.findByUser_Id(scanUser.getId())
+                    .orElseGet(() -> {
+                        EmailSyncState s = new EmailSyncState(scanUser);
+                        s.setLastProcessedInternalDate(0L);
+                        return emailSyncStateRepository.save(s);
+                    });
 
             long lastProcessed = state.getLastProcessedInternalDate() == null
                     ? 0L
@@ -117,7 +145,7 @@ public class GmailBackgroundScanner {
                 return;
             }
 
-            System.out.println("Scanning Gmail...");
+            System.out.println("[GmailScanner] Scanning Gmail for user: " + scanUser.getUsername() + "...");
             String query = "is:unread subject:(application OR job OR interview OR offer OR rejected)";
             ListMessagesResponse response = service.users().messages().list("me")
                     .setQ(query)
@@ -158,10 +186,10 @@ public class GmailBackgroundScanner {
                 if (newStatus != null) {
                     // If status is "APPLIED", try to create new application
                     if ("APPLIED".equals(newStatus)) {
-                        createApplicationFromEmail(subject, body, sender);
+                        createApplicationFromEmail(subject, body, sender, scanUser);
                     } else {
                         // For other statuses, update existing application
-                        updateExistingApplication(sender, subject, body, newStatus);
+                        updateExistingApplication(sender, subject, body, newStatus, scanUser);
                     }
                 }
 
@@ -186,7 +214,7 @@ public class GmailBackgroundScanner {
      * Create a new application from email (when status = APPLIED)
      * Uses regex + LLM fallback for company/title extraction
      */
-    private void createApplicationFromEmail(String subject, String body, String sender) {
+    private void createApplicationFromEmail(String subject, String body, String sender, User user) {
         try {
             // Step 1: Extract company and job title using regex
             String company = emailParserService.extractCompany(sender, subject, body);
@@ -207,17 +235,19 @@ public class GmailBackgroundScanner {
                 }
             }
 
-            // Step 3: Check for duplicate (company + title combo)
-            Application existing = applicationRepository.findByCompanyAndTitle(company, jobTitle);
+            // Step 3: Check for duplicate (company + title combo) for THIS USER
+            Application existing = applicationRepository.findByUser_IdAndCompanyAndTitle(
+                    user.getId(), company, jobTitle);
 
             if (existing != null) {
                 System.out.println("[GmailScanner] Application already exists for " +
-                        company + " - " + jobTitle + ", skipping creation");
+                        company + " - " + jobTitle + " (user: " + user.getUsername() + "), skipping creation");
                 return;
             }
 
-            // Step 4: Create new application
+            // Step 4: Create new application for this user
             Application application = new Application();
+            application.setUser(user);
             application.setCompany(company);
             application.setTitle(jobTitle);
             application.setStatus("APPLIED");
@@ -230,7 +260,8 @@ public class GmailBackgroundScanner {
             );
 
             applicationRepository.save(application);
-            System.out.println("[GmailScanner] ✅ Created new application: " + company + " - " + jobTitle);
+            System.out.println("[GmailScanner] ✅ Created new application for user " + 
+                    user.getUsername() + ": " + company + " - " + jobTitle);
 
         } catch (Exception e) {
             System.err.println("[GmailScanner] Error creating application: " + e.getMessage());
@@ -241,8 +272,9 @@ public class GmailBackgroundScanner {
     /**
      * Update existing application based on email (for INTERVIEW, OFFER, REJECTED)
      * Uses company + title matching with fallback to company-only
+     * Only updates applications belonging to the specified user
      */
-    private void updateExistingApplication(String sender, String subject, String body, String newStatus) {
+    private void updateExistingApplication(String sender, String subject, String body, String newStatus, User user) {
         try {
             // Extract company and job title
             String company = emailParserService.extractCompany(sender, subject, body);
@@ -259,17 +291,20 @@ public class GmailBackgroundScanner {
 
             Application application = null;
 
-            // Strategy 1: Try exact match (company + title)
+            // Strategy 1: Try exact match (user + company + title)
             if (jobTitle != null && !jobTitle.equals("Unknown Position")) {
-                application = applicationRepository.findByCompanyAndTitle(company, jobTitle);
+                application = applicationRepository.findByUser_IdAndCompanyAndTitle(
+                        user.getId(), company, jobTitle);
             }
 
-            // Strategy 2: Fallback to any application from this company
+            // Strategy 2: Fallback to any application from this company for this user
             if (application == null) {
-                List<Application> companyApps = applicationRepository.findAllByCompany(company);
+                List<Application> companyApps = applicationRepository.findAllByUser_IdAndCompany(
+                        user.getId(), company);
                 if (!companyApps.isEmpty()) {
                     application = companyApps.get(0);
-                    System.out.println("[GmailScanner] ⚠️ No exact match found, updating first application for " + company);
+                    System.out.println("[GmailScanner] ⚠️ No exact match found, updating first application for " + 
+                            company + " (user: " + user.getUsername() + ")");
                 }
             }
 
@@ -277,7 +312,8 @@ public class GmailBackgroundScanner {
             if (application != null) {
                 if (!newStatus.equals(application.getStatus())) {
                     System.out.println("[GmailScanner] Updating " + application.getCompany() +
-                            " - " + application.getTitle() + " status to " + newStatus);
+                            " - " + application.getTitle() + " status to " + newStatus + 
+                            " (user: " + user.getUsername() + ")");
 
                     String existingNotes = application.getNotes() == null ? "" : application.getNotes();
                     String autoNote = "\n[Auto-Update " + LocalDate.now() + "] Status: " + newStatus;
@@ -287,7 +323,8 @@ public class GmailBackgroundScanner {
                     applicationRepository.save(application);
                 }
             } else {
-                System.out.println("[GmailScanner] ⚠️ No matching application found for: " + company);
+                System.out.println("[GmailScanner] ⚠️ No matching application found for: " + company + 
+                        " (user: " + user.getUsername() + ")");
             }
 
         } catch (Exception e) {

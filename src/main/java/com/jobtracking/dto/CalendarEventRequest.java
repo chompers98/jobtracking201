@@ -1,25 +1,27 @@
 package com.jobtracking.dto;
 
+import java.util.UUID;
+
 /**
  * Request DTO for creating Google Calendar events
  */
 public class CalendarEventRequest {
 
-    private Long reminderId;
+    private UUID reminderId;
     private String accessToken;
 
     public CalendarEventRequest() {}
 
-    public CalendarEventRequest(Long reminderId, String accessToken) {
+    public CalendarEventRequest(UUID reminderId, String accessToken) {
         this.reminderId = reminderId;
         this.accessToken = accessToken;
     }
 
-    public Long getReminderId() {
+    public UUID getReminderId() {
         return reminderId;
     }
 
-    public void setReminderId(Long reminderId) {
+    public void setReminderId(UUID reminderId) {
         this.reminderId = reminderId;
     }
 

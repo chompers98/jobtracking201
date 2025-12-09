@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/api")
@@ -38,13 +39,30 @@ public class ApplicationController {
         this.userRepository = userRepository;
     }
 
+    /**
+     * Helper method to get the current authenticated user
+     */
+    private User getCurrentUser() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !auth.isAuthenticated()) {
+            throw new RuntimeException("User not authenticated");
+        }
+        String username = auth.getName();
+        return userRepository.findByUsername(username)
+                .orElseThrow(() -> new RuntimeException("User not found: " + username));
+    }
+
     @GetMapping("/apps")
     public List<Application> getAllApplications() {
-        return applicationRepository.findAll();
+        User currentUser = getCurrentUser();
+        return applicationRepository.findByUser_Id(currentUser.getId());
     }
 
     @PostMapping("/apps")
     public Application createApplication(@RequestBody Application application) {
+        User currentUser = getCurrentUser();
+        application.setUser(currentUser);
+        
         if (application.getCreatedAt() == null) {
             application.setCreatedAt(LocalDate.now());
         }
@@ -55,15 +73,19 @@ public class ApplicationController {
     }
 
     @GetMapping("/apps/{id}")
-    public ResponseEntity<Application> getApplication(@PathVariable Long id) {
+    public ResponseEntity<Application> getApplication(@PathVariable UUID id) {
+        User currentUser = getCurrentUser();
         return applicationRepository.findById(id)
+                .filter(app -> app.getUser().getId().equals(currentUser.getId()))
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }
 
     @PutMapping("/apps/{id}")
-    public ResponseEntity<Application> updateApplication(@PathVariable Long id, @RequestBody Application appDetails) {
+    public ResponseEntity<Application> updateApplication(@PathVariable UUID id, @RequestBody Application appDetails) {
+        User currentUser = getCurrentUser();
         return applicationRepository.findById(id)
+                .filter(app -> app.getUser().getId().equals(currentUser.getId()))
                 .map(app -> {
                     app.setCompany(appDetails.getCompany());
                     app.setTitle(appDetails.getTitle());
@@ -83,8 +105,10 @@ public class ApplicationController {
     }
 
     @PutMapping("/apps/{id}/status")
-    public ResponseEntity<Application> updateStatus(@PathVariable Long id, @RequestBody Application statusUpdate) {
+    public ResponseEntity<Application> updateStatus(@PathVariable UUID id, @RequestBody Application statusUpdate) {
+        User currentUser = getCurrentUser();
         return applicationRepository.findById(id)
+                .filter(app -> app.getUser().getId().equals(currentUser.getId()))
                 .map(app -> {
                     app.setStatus(statusUpdate.getStatus());
                     return ResponseEntity.ok(applicationRepository.save(app));
@@ -93,8 +117,10 @@ public class ApplicationController {
     }
 
     @DeleteMapping("/apps/{id}")
-    public ResponseEntity<?> deleteApplication(@PathVariable Long id) {
+    public ResponseEntity<?> deleteApplication(@PathVariable UUID id) {
+        User currentUser = getCurrentUser();
         return applicationRepository.findById(id)
+                .filter(app -> app.getUser().getId().equals(currentUser.getId()))
                 .map(app -> {
                     applicationRepository.delete(app);
                     return ResponseEntity.ok().build();
@@ -109,7 +135,7 @@ public class ApplicationController {
      */
     @PostMapping("/apps/{appId}/calendar")
     public ResponseEntity<CalendarEventResponse> createCalendarEvent(
-            @PathVariable Long appId,
+            @PathVariable UUID appId,
             @RequestBody CalendarEventRequest request) {
 
         try {

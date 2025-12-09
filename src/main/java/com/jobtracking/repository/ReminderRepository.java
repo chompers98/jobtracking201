@@ -4,9 +4,10 @@ import com.jobtracking.model.Reminder;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 import java.util.List;
+import java.util.UUID;
 
 @Repository
-public interface ReminderRepository extends JpaRepository<Reminder, Long> {
-    List<Reminder> findByApplicationId(Long applicationId);
+public interface ReminderRepository extends JpaRepository<Reminder, UUID> {
+    List<Reminder> findByApplicationId(UUID applicationId);
 }
 
