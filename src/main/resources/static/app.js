@@ -983,30 +983,29 @@ async function openEventModal(eventId = null, prefilledAppId = null) {
   if (event) {
     eventTypeSelect.value = event.kind;
     eventTitle.value = event.title || "";
-    eventApplicationId.value = event.application_id || "";
+    eventApplicationId.value = event.applicationId || event.application_id || "";
     eventNotes.value = event.notes || "";
     eventColor.value = event.color || "";
     
     // Populate type-specific fields
+    const triggerAt = event.triggerAt || event.trigger_at || "";
+    const endDate = event.endDate || event.end_date || "";
+    const startTime = event.startTime || event.start_time || "";
+    const endTime = event.endTime || event.end_time || "";
+    const meetingLink = event.meetingLink || event.meeting_link || "";
+    
     if (event.kind === "DEADLINE") {
-      document.getElementById("event-deadline").value = event.trigger_at || "";
+      document.getElementById("event-deadline").value = triggerAt;
     } else if (event.kind === "INTERVIEW") {
-      document.getElementById("event-start-date").value = event.trigger_at || "";
-      document.getElementById("event-end-date").value = event.end_date || "";
-      document.getElementById("event-start-time").value = event.start_time || "";
-      document.getElementById("event-end-time").value = event.end_time || "";
+      document.getElementById("event-start-date").value = triggerAt;
+      document.getElementById("event-end-date").value = endDate;
+      document.getElementById("event-start-time").value = startTime;
+      document.getElementById("event-end-time").value = endTime;
       document.getElementById("event-location").value = event.location || "";
-      document.getElementById("event-meeting-link").value = event.meeting_link || "";
+      document.getElementById("event-meeting-link").value = meetingLink;
     } else if (event.kind === "FOLLOWUP") {
-        // Use assignment-fields for followup for now, assuming similar structure
-        // But we need to check if assignment fields exist in DOM and if they fit
-        // The UI HTML likely has IDs like 'event-assignment-deadline'.
-        // Since we replaced 'assignment' with 'FOLLOWUP' or 'DEADLINE', 
-        // we need to map what the UI has to what we want.
-        // The HTML has <div id="assignment-fields">...</div> likely.
-        // We will map FOLLOWUP to use assignment fields if possible, or generic.
         const assignmentDeadline = document.getElementById("event-assignment-deadline");
-        if (assignmentDeadline) assignmentDeadline.value = event.trigger_at || "";
+        if (assignmentDeadline) assignmentDeadline.value = triggerAt;
     }
   } else {
     form.reset();
@@ -1079,7 +1078,7 @@ async function saveEvent(eventId) {
   const payload = {
     kind: eventType,
     title: eventTitle,
-    application_id: eventApplicationId ? parseInt(eventApplicationId) : null,
+    applicationId: eventApplicationId || null,  // UUID string, not int
     notes: eventNotes,
     color: eventColor,
   };
@@ -1091,26 +1090,26 @@ async function saveEvent(eventId) {
       alert("Please enter a deadline");
       return;
     }
-    payload.trigger_at = deadline;
+    payload.triggerAt = deadline;
   } else if (eventType === "INTERVIEW") {
     const startDate = document.getElementById("event-start-date").value;
     if (!startDate) {
       alert("Please enter a start date");
       return;
     }
-    payload.trigger_at = startDate;
-    payload.end_date = document.getElementById("event-end-date").value || startDate;
-    payload.start_time = document.getElementById("event-start-time").value;
-    payload.end_time = document.getElementById("event-end-time").value;
+    payload.triggerAt = startDate;
+    payload.endDate = document.getElementById("event-end-date").value || startDate;
+    payload.startTime = document.getElementById("event-start-time").value;
+    payload.endTime = document.getElementById("event-end-time").value;
     payload.location = document.getElementById("event-location").value;
-    payload.meeting_link = document.getElementById("event-meeting-link").value;
+    payload.meetingLink = document.getElementById("event-meeting-link").value;
   } else if (eventType === "FOLLOWUP") {
     const deadline = document.getElementById("event-assignment-deadline").value;
     if (!deadline) {
       alert("Please enter a deadline");
       return;
     }
-    payload.trigger_at = deadline;
+    payload.triggerAt = deadline;
   }
 
   try {

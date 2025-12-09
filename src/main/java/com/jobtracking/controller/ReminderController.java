@@ -39,8 +39,24 @@ public class ReminderController {
         return reminderRepository.findAll();
     }
 
+    /**
+     * Helper method to get the current authenticated user
+     */
+    private User getCurrentUser() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !auth.isAuthenticated()) {
+            throw new RuntimeException("User not authenticated");
+        }
+        String username = auth.getName();
+        return userRepository.findByUsername(username)
+                .orElseThrow(() -> new RuntimeException("User not found: " + username));
+    }
+
     @PostMapping
     public Reminder createReminder(@RequestBody Reminder reminder) {
+        User currentUser = getCurrentUser();
+        reminder.setUser(currentUser);
+        
         if (reminder.getCreatedAt() == null) {
             reminder.setCreatedAt(LocalDate.now());
         }

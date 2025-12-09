@@ -58,6 +58,68 @@ public class ApplicationController {
         return applicationRepository.findByUser_Id(currentUser.getId());
     }
 
+    /**
+     * Get calendar events (reminders) for the current user
+     * This must be defined BEFORE /apps/{id} to avoid UUID parsing issues
+     */
+    @GetMapping("/apps/calendar")
+    public List<java.util.Map<String, Object>> getCalendarEvents() {
+        User currentUser = getCurrentUser();
+        
+        // Fetch reminders directly by user_id
+        List<Reminder> reminders = reminderRepository.findByUser_Id(currentUser.getId());
+        
+        // Transform reminders to calendar event format expected by frontend
+        return reminders.stream().map(r -> {
+            java.util.Map<String, Object> event = new java.util.HashMap<>();
+            event.put("id", r.getId());
+            event.put("title", r.getTitle());
+            event.put("date", r.getTriggerAt() != null ? r.getTriggerAt().toString() : null);
+            event.put("color", r.getColor());
+            event.put("kind", r.getKind());
+            event.put("application_id", r.getApplicationId());
+            event.put("notes", r.getNotes());
+            
+            // Add subtitle for interviews with time
+            if ("INTERVIEW".equals(r.getKind()) && r.getStartTime() != null) {
+                event.put("subtitle", r.getStartTime());
+            }
+            
+            // Interview-specific fields
+            event.put("end_date", r.getEndDate() != null ? r.getEndDate().toString() : null);
+            event.put("start_time", r.getStartTime());
+            event.put("end_time", r.getEndTime());
+            event.put("location", r.getLocation());
+            event.put("meeting_link", r.getMeetingLink());
+            event.put("trigger_at", r.getTriggerAt() != null ? r.getTriggerAt().toString() : null);
+            
+            return event;
+        }).toList();
+    }
+
+    /**
+     * Get dashboard summary metrics
+     */
+    @GetMapping("/dashboard-summary")
+    public java.util.Map<String, Object> getDashboardSummary() {
+        User currentUser = getCurrentUser();
+        List<Application> apps = applicationRepository.findByUser_Id(currentUser.getId());
+        
+        java.util.Map<String, Object> summary = new java.util.HashMap<>();
+        summary.put("totalApplications", apps.size());
+        
+        // Count by status
+        java.util.Map<String, Long> byStatus = apps.stream()
+                .filter(a -> a.getStatus() != null)
+                .collect(java.util.stream.Collectors.groupingBy(
+                        Application::getStatus,
+                        java.util.stream.Collectors.counting()
+                ));
+        summary.put("byStatus", byStatus);
+        
+        return summary;
+    }
+
     @PostMapping("/apps")
     public Application createApplication(@RequestBody Application application) {
         User currentUser = getCurrentUser();

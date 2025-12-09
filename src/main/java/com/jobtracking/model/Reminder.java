@@ -1,5 +1,6 @@
 package com.jobtracking.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import org.hibernate.annotations.GenericGenerator;
 import java.time.LocalDate;
@@ -21,6 +22,11 @@ public class Reminder {
     
     @Column(name = "application_id", columnDefinition = "uuid")
     private UUID applicationId;
+    
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id")
+    @JsonIgnore
+    private User user;
     
     @Column(columnDefinition = "TEXT")
     private String notes;
@@ -95,5 +101,8 @@ public class Reminder {
     
     public String getMeetingLink() { return meetingLink; }
     public void setMeetingLink(String meetingLink) { this.meetingLink = meetingLink; }
+    
+    public User getUser() { return user; }
+    public void setUser(User user) { this.user = user; }
 }
 

@@ -9,5 +9,7 @@ import java.util.UUID;
 @Repository
 public interface ReminderRepository extends JpaRepository<Reminder, UUID> {
     List<Reminder> findByApplicationId(UUID applicationId);
+    List<Reminder> findByApplicationIdIn(List<UUID> applicationIds);
+    List<Reminder> findByUser_Id(UUID userId);
 }
 
