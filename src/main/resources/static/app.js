@@ -232,17 +232,12 @@ async function initApplicationsPage() {
     tableBody.innerHTML = "";
     filtered.forEach((app, idx) => {
       const tr = document.createElement("tr");
-      // Use job_link for "View" button to open the job posting
-      const jobLink = app.job_link || app.jobLink;
-      const viewLink = jobLink 
-        ? `<a href="${jobLink}" target="_blank" rel="noopener noreferrer">View Job</a>`
-        : `<span style="color: #9ca3af;">No link</span>`;
       
       tr.innerHTML = `
         <td>${app.company}</td>
         <td>${app.title}</td>
         <td>${app.location || "-"}</td>
-        <td class="link-cell">${viewLink} · <a href="application_detail.html?id=${app.id}">Details</a></td>
+        <td class="link-cell"><a href="application_detail.html?id=${app.id}">View</a></td>
         <td class="status-cell">${renderStatusTag(app.status)}</td>
       `;
       tableBody.appendChild(tr);
