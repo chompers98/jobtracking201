@@ -295,7 +295,7 @@ async function initDetailPage() {
     const docsContainer = document.querySelector("#docs-container");
 
     if (titleEl) titleEl.textContent = app.title;
-    if (companyEl) companyEl.textContent = `${app.company} Inc.`;
+    if (companyEl) companyEl.textContent = app.company;
     if (statusEl) {
       statusEl.innerHTML = renderStatusDropdown(app.status, app.id);
       

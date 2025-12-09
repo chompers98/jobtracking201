@@ -145,6 +145,19 @@ public class ApplicationController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
+    /**
+     * Get reminders for a specific application
+     */
+    @GetMapping("/apps/{id}/reminders")
+    public ResponseEntity<List<Reminder>> getApplicationReminders(@PathVariable UUID id) {
+        User currentUser = getCurrentUser();
+        // Verify the application belongs to the current user
+        return applicationRepository.findById(id)
+                .filter(app -> app.getUser().getId().equals(currentUser.getId()))
+                .map(app -> ResponseEntity.ok(reminderRepository.findByApplicationId(id)))
+                .orElse(ResponseEntity.notFound().build());
+    }
+
     @PutMapping("/apps/{id}")
     public ResponseEntity<Application> updateApplication(@PathVariable UUID id, @RequestBody Application appDetails) {
         User currentUser = getCurrentUser();
