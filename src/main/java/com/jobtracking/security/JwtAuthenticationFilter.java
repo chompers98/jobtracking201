@@ -25,8 +25,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         String path = request.getRequestURI();
 
-        // Skip JWT validation for public endpoints
-        if (path.startsWith("/api/oauth/") ||
+        // Skip JWT validation for public endpoints, BUT require JWT for OAuth authorize
+        // OAuth callback should be public, but authorize should require authentication
+        if ((path.startsWith("/api/oauth/") && !path.equals("/api/oauth/google/authorize")) ||
                 path.startsWith("/oauth2/") ||
                 path.equals("/api/auth/register") ||
                 path.equals("/api/auth/login") ||
@@ -65,6 +66,16 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         if (StringUtils.hasText(bearerToken) && bearerToken.startsWith("Bearer ")) {
             return bearerToken.substring(7);
         }
+
+        // Fallback: try to get from cookie
+        if (request.getCookies() != null) {
+            for (jakarta.servlet.http.Cookie cookie : request.getCookies()) {
+                if ("jwtToken".equals(cookie.getName())) {
+                    return cookie.getValue();
+                }
+            }
+        }
+
         return null;
     }
 }

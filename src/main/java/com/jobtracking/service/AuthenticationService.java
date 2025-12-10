@@ -114,5 +114,8 @@ public class AuthenticationService {
     public Optional<User> getUserByUsername(String username) {
         return userRepository.findByUsername(username);
     }
-}
 
+    public UserRepository getUserRepository() {
+        return userRepository;
+    }
+}

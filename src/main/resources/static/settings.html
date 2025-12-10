@@ -311,7 +311,11 @@
             }),
           });
 
-          // Redirect to OAuth flow
+          // Store JWT in cookie before OAuth redirect (so it persists across the redirect)
+          document.cookie = `jwtToken=${localStorage.getItem('jwtToken')}; path=/`;
+          console.log("[Google OAuth] JWT stored in cookie");
+
+          // Now redirect - the cookie will be automatically sent
           window.location.href = "/api/oauth/google/authorize";
           
         } catch (error) {

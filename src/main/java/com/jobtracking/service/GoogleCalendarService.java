@@ -82,8 +82,8 @@ public class GoogleCalendarService {
                 .insert("primary", event)
                 .execute();
 
-        System.out.println("Created calendar event: " + createdEvent.getHtmlLink());
-        return createdEvent.getHtmlLink();
+        System.out.println("[Google Calendar] ✓ Created calendar event ID: " + createdEvent.getId());
+        return createdEvent.getId();
     }
 
     /**
@@ -182,5 +182,92 @@ public class GoogleCalendarService {
         } catch (Exception e) {
             return false;
         }
+    }
+
+    /**
+     * Update an existing Google Calendar event
+     *
+     * @param googleCalendarEventId The ID of the event to update
+     * @param reminder The reminder with updated data
+     * @param accessToken User's Google OAuth access token
+     * @param userTimezone User's timezone
+     * @return The HTML link to the updated calendar event
+     */
+    public String updateCalendarEvent(String googleCalendarEventId, Reminder reminder, String accessToken, String userTimezone)
+            throws IOException, GeneralSecurityException {
+
+        NetHttpTransport httpTransport = GoogleNetHttpTransport.newTrustedTransport();
+
+        // Create credentials from access token
+        GoogleCredentials credentials = GoogleCredentials.create(
+                new AccessToken(accessToken, null)
+        );
+
+        // Build Calendar service
+        Calendar service = new Calendar.Builder(
+                httpTransport,
+                JSON_FACTORY,
+                new HttpCredentialsAdapter(credentials))
+                .setApplicationName(APPLICATION_NAME)
+                .build();
+
+        // Get existing event
+        Event event = service.events().get("primary", googleCalendarEventId).execute();
+
+        // Update event details
+        event.setSummary(reminder.getTitle() != null ? reminder.getTitle() : "Job Application Reminder")
+                .setDescription(buildEventDescription(reminder));
+
+        // Update time based on reminder type
+        if ("INTERVIEW".equals(reminder.getKind()) && reminder.getStartTime() != null) {
+            setInterviewDateTime(event, reminder, userTimezone);
+        } else {
+            setAllDayEvent(event, reminder);
+        }
+
+        // Update location if available
+        if (reminder.getLocation() != null && !reminder.getLocation().isEmpty()) {
+            event.setLocation(reminder.getLocation());
+        } else {
+            event.setLocation(null);
+        }
+
+        // Update the event
+        Event updatedEvent = service.events()
+                .update("primary", googleCalendarEventId, event)
+                .execute();
+
+        System.out.println("[Google Calendar] ✓ Updated calendar event ID: " + updatedEvent.getId());
+        return updatedEvent.getId();
+    }
+
+    /**
+     * Delete a Google Calendar event
+     *
+     * @param googleCalendarEventId The ID of the event to delete
+     * @param accessToken User's Google OAuth access token
+     */
+    public void deleteCalendarEvent(String googleCalendarEventId, String accessToken)
+            throws IOException, GeneralSecurityException {
+
+        NetHttpTransport httpTransport = GoogleNetHttpTransport.newTrustedTransport();
+
+        // Create credentials from access token
+        GoogleCredentials credentials = GoogleCredentials.create(
+                new AccessToken(accessToken, null)
+        );
+
+        // Build Calendar service
+        Calendar service = new Calendar.Builder(
+                httpTransport,
+                JSON_FACTORY,
+                new HttpCredentialsAdapter(credentials))
+                .setApplicationName(APPLICATION_NAME)
+                .build();
+
+        // Delete the event
+        service.events().delete("primary", googleCalendarEventId).execute();
+
+        System.out.println("[Google Calendar] ✓ Deleted calendar event ID: " + googleCalendarEventId);
     }
 }

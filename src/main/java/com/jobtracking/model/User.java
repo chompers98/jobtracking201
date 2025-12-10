@@ -36,10 +36,20 @@ public class User {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
+    // Google Calendar Integration
+    @Column(name = "google_calendar_enabled")
+    private boolean googleCalendarEnabled = false;
+
+    @Column(name = "google_access_token", columnDefinition = "TEXT")
+    private String googleAccessToken;
+
+    @Column(name = "google_refresh_token", columnDefinition = "TEXT")
+    private String googleRefreshToken;
+
     // Constructors
     public User() {}
 
-    public User(UUID id, String email, String username, String passwordHash, 
+    public User(UUID id, String email, String username, String passwordHash,
                 String role, String timezone, LocalDateTime createdAt, LocalDateTime updatedAt) {
         this.id = id;
         this.email = email;
@@ -92,4 +102,14 @@ public class User {
     protected void onUpdate() {
         updatedAt = LocalDateTime.now();
     }
+
+    // Google Calendar Integration Getters and Setters
+    public boolean isGoogleCalendarEnabled() { return googleCalendarEnabled; }
+    public void setGoogleCalendarEnabled(boolean googleCalendarEnabled) { this.googleCalendarEnabled = googleCalendarEnabled; }
+
+    public String getGoogleAccessToken() { return googleAccessToken; }
+    public void setGoogleAccessToken(String googleAccessToken) { this.googleAccessToken = googleAccessToken; }
+
+    public String getGoogleRefreshToken() { return googleRefreshToken; }
+    public void setGoogleRefreshToken(String googleRefreshToken) { this.googleRefreshToken = googleRefreshToken; }
 }
