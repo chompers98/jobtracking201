@@ -8,6 +8,8 @@ import com.google.api.client.util.DateTime;
 import com.google.api.services.calendar.Calendar;
 import com.google.api.services.calendar.model.Event;
 import com.google.api.services.calendar.model.EventDateTime;
+import com.google.api.services.tasks.Tasks;
+import com.google.api.services.tasks.model.Task;
 import com.google.auth.http.HttpCredentialsAdapter;
 import com.google.auth.oauth2.AccessToken;
 import com.google.auth.oauth2.GoogleCredentials;
@@ -34,14 +36,21 @@ public class GoogleCalendarService {
 
     /**
      * Create a Google Calendar event from a reminder
+     * Note: FOLLOWUP reminders do NOT create calendar events - only Google Tasks
      *
      * @param reminder The reminder to create an event for
      * @param accessToken User's Google OAuth access token
      * @param userTimezone User's timezone (e.g., "America/Los_Angeles")
-     * @return The HTML link to the created calendar event
+     * @return The calendar event ID (null for FOLLOWUP reminders)
      */
     public String createCalendarEvent(Reminder reminder, String accessToken, String userTimezone)
             throws IOException, GeneralSecurityException {
+
+        // FOLLOWUP reminders should NOT create calendar events - only Google Tasks
+        if ("FOLLOWUP".equals(reminder.getKind())) {
+            System.out.println("[Google Calendar] ⊘ Skipping calendar event for FOLLOWUP - will create Google Task instead");
+            return null;
+        }
 
         NetHttpTransport httpTransport = GoogleNetHttpTransport.newTrustedTransport();
 
@@ -67,8 +76,11 @@ public class GoogleCalendarService {
         if ("INTERVIEW".equals(reminder.getKind()) && reminder.getStartTime() != null) {
             // Interview with specific time
             setInterviewDateTime(event, reminder, userTimezone);
+        } else if ("DEADLINE".equals(reminder.getKind()) && reminder.getStartTime() != null) {
+            // Application deadline with specific time: create 0-minute event at that time
+            setDeadlineDateTime(event, reminder, userTimezone);
         } else {
-            // All-day event for deadlines and follow-ups
+            // All-day event for deadlines without specific time
             setAllDayEvent(event, reminder);
         }
 
@@ -132,6 +144,39 @@ public class GoogleCalendarService {
 
         } catch (Exception e) {
             System.err.println("Error parsing interview time, defaulting to all-day event: " + e.getMessage());
+            setAllDayEvent(event, reminder);
+        }
+    }
+
+    /**
+     * Set application deadline date/time as a 0-minute event at the specified time
+     */
+    private void setDeadlineDateTime(Event event, Reminder reminder, String userTimezone) {
+        try {
+            // Parse deadline time
+            LocalTime deadlineTime = LocalTime.parse(reminder.getStartTime(),
+                    DateTimeFormatter.ofPattern("HH:mm"));
+            LocalDateTime deadlineDateTime = reminder.getTriggerAt().atTime(deadlineTime);
+
+            // Convert to user's timezone
+            ZoneId zoneId = ZoneId.of(userTimezone != null ? userTimezone : "America/Los_Angeles");
+
+            long deadlineMillis = deadlineDateTime
+                    .atZone(zoneId)
+                    .toInstant()
+                    .toEpochMilli();
+
+            // Set start and end to the SAME time (0-minute event)
+            event.setStart(new EventDateTime()
+                    .setDateTime(new DateTime(new Date(deadlineMillis)))
+                    .setTimeZone(userTimezone != null ? userTimezone : "America/Los_Angeles"));
+
+            event.setEnd(new EventDateTime()
+                    .setDateTime(new DateTime(new Date(deadlineMillis)))
+                    .setTimeZone(userTimezone != null ? userTimezone : "America/Los_Angeles"));
+
+        } catch (Exception e) {
+            System.err.println("Error parsing deadline time, defaulting to all-day event: " + e.getMessage());
             setAllDayEvent(event, reminder);
         }
     }
@@ -221,6 +266,9 @@ public class GoogleCalendarService {
         // Update time based on reminder type
         if ("INTERVIEW".equals(reminder.getKind()) && reminder.getStartTime() != null) {
             setInterviewDateTime(event, reminder, userTimezone);
+        } else if ("DEADLINE".equals(reminder.getKind()) && reminder.getStartTime() != null) {
+            // Application deadline with specific time: create 0-minute event at that time
+            setDeadlineDateTime(event, reminder, userTimezone);
         } else {
             setAllDayEvent(event, reminder);
         }
@@ -269,5 +317,153 @@ public class GoogleCalendarService {
         service.events().delete("primary", googleCalendarEventId).execute();
 
         System.out.println("[Google Calendar] ✓ Deleted calendar event ID: " + googleCalendarEventId);
+    }
+
+    /**
+     * Create a Google Task for a followup reminder
+     *
+     * @param reminder The reminder to create a task for
+     * @param accessToken User's Google OAuth access token
+     * @return The task ID
+     */
+    public String createGoogleTask(Reminder reminder, String accessToken)
+            throws IOException, GeneralSecurityException {
+
+        NetHttpTransport httpTransport = GoogleNetHttpTransport.newTrustedTransport();
+
+        // Create credentials from access token
+        GoogleCredentials credentials = GoogleCredentials.create(
+                new AccessToken(accessToken, null)
+        );
+
+        // Build Tasks service
+        Tasks service = new Tasks.Builder(
+                httpTransport,
+                JSON_FACTORY,
+                new HttpCredentialsAdapter(credentials))
+                .setApplicationName(APPLICATION_NAME)
+                .build();
+
+        // Create task
+        Task task = new Task()
+                .setTitle(reminder.getTitle() != null ? reminder.getTitle() : "Job Application Task")
+                .setNotes(buildTaskDescription(reminder));
+
+        // Set due date (Google Tasks uses RFC 3339 format)
+        if (reminder.getTriggerAt() != null) {
+            // Convert LocalDate to RFC 3339 format: 2025-12-14T00:00:00Z
+            String dueDate = reminder.getTriggerAt().toString() + "T00:00:00Z";
+            task.setDue(dueDate);
+            System.out.println("[Google Tasks] Due date set to: " + dueDate);
+        }
+
+        // Insert task into @default tasklist
+        Task createdTask = service.tasks()
+                .insert("@default", task)
+                .execute();
+
+        System.out.println("[Google Tasks] ✓ Created task ID: " + createdTask.getId());
+        return createdTask.getId();
+    }
+
+    /**
+     * Update an existing Google Task
+     *
+     * @param googleTaskId The ID of the task to update
+     * @param reminder The reminder with updated data
+     * @param accessToken User's Google OAuth access token
+     * @return The task ID
+     */
+    public String updateGoogleTask(String googleTaskId, Reminder reminder, String accessToken)
+            throws IOException, GeneralSecurityException {
+
+        NetHttpTransport httpTransport = GoogleNetHttpTransport.newTrustedTransport();
+
+        // Create credentials from access token
+        GoogleCredentials credentials = GoogleCredentials.create(
+                new AccessToken(accessToken, null)
+        );
+
+        // Build Tasks service
+        Tasks service = new Tasks.Builder(
+                httpTransport,
+                JSON_FACTORY,
+                new HttpCredentialsAdapter(credentials))
+                .setApplicationName(APPLICATION_NAME)
+                .build();
+
+        // Get existing task
+        Task task = service.tasks().get("@default", googleTaskId).execute();
+
+        // Update task details
+        task.setTitle(reminder.getTitle() != null ? reminder.getTitle() : "Job Application Task")
+                .setNotes(buildTaskDescription(reminder));
+
+        // Update due date (Google Tasks uses YYYY-MM-DD format)
+        if (reminder.getTriggerAt() != null) {
+            String dueDate = reminder.getTriggerAt().toString(); // LocalDate.toString() returns YYYY-MM-DD
+            task.setDue(dueDate);
+            System.out.println("[Google Tasks] Updated due date to: " + dueDate);
+        }
+
+        // Update the task
+        Task updatedTask = service.tasks()
+                .update("@default", googleTaskId, task)
+                .execute();
+
+        System.out.println("[Google Tasks] ✓ Updated task ID: " + updatedTask.getId());
+        return updatedTask.getId();
+    }
+
+    /**
+     * Delete a Google Task
+     *
+     * @param googleTaskId The ID of the task to delete
+     * @param accessToken User's Google OAuth access token
+     */
+    public void deleteGoogleTask(String googleTaskId, String accessToken)
+            throws IOException, GeneralSecurityException {
+
+        NetHttpTransport httpTransport = GoogleNetHttpTransport.newTrustedTransport();
+
+        // Create credentials from access token
+        GoogleCredentials credentials = GoogleCredentials.create(
+                new AccessToken(accessToken, null)
+        );
+
+        // Build Tasks service
+        Tasks service = new Tasks.Builder(
+                httpTransport,
+                JSON_FACTORY,
+                new HttpCredentialsAdapter(credentials))
+                .setApplicationName(APPLICATION_NAME)
+                .build();
+
+        // Delete the task
+        service.tasks().delete("@default", googleTaskId).execute();
+
+        System.out.println("[Google Tasks] ✓ Deleted task ID: " + googleTaskId);
+    }
+
+    /**
+     * Build task description from reminder
+     */
+    private String buildTaskDescription(Reminder reminder) {
+        StringBuilder description = new StringBuilder();
+
+        if (reminder.getNotes() != null && !reminder.getNotes().isEmpty()) {
+            description.append(reminder.getNotes()).append("\n\n");
+        }
+
+        description.append("Reminder Type: ").append(reminder.getKind()).append("\n");
+
+        if (reminder.getApplicationId() != null) {
+            description.append("Application ID: ").append(reminder.getApplicationId()).append("\n");
+        }
+
+        description.append("\n---\n");
+        description.append("Created by JobTracker");
+
+        return description.toString();
     }
 }

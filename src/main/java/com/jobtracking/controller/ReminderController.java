@@ -14,6 +14,8 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
+import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.UUID;
 
@@ -40,6 +42,35 @@ public class ReminderController {
     }
 
     /**
+     * Validate that interview end time is not earlier than start time
+     * Prevents invalid interview durations
+     */
+    private void validateInterviewTimes(Reminder reminder) {
+        if ("INTERVIEW".equals(reminder.getKind()) &&
+                reminder.getStartTime() != null &&
+                reminder.getEndTime() != null &&
+                !reminder.getEndTime().isEmpty()) {
+
+            try {
+                LocalTime startTime = LocalTime.parse(reminder.getStartTime(),
+                        DateTimeFormatter.ofPattern("HH:mm"));
+                LocalTime endTime = LocalTime.parse(reminder.getEndTime(),
+                        DateTimeFormatter.ofPattern("HH:mm"));
+
+                // If end time is before start time, auto-correct it
+                if (endTime.isBefore(startTime)) {
+                    LocalTime correctedEndTime = startTime.plusHours(1);
+                    reminder.setEndTime(correctedEndTime.format(DateTimeFormatter.ofPattern("HH:mm")));
+                    System.out.println("[Time Validation] ⚠ Corrected interview end time from " +
+                            endTime + " to " + correctedEndTime);
+                }
+            } catch (Exception e) {
+                System.err.println("[Time Validation] Error parsing interview times: " + e.getMessage());
+            }
+        }
+    }
+
+    /**
      * Helper method to get the current authenticated user
      */
     private User getCurrentUser() {
@@ -63,6 +94,9 @@ public class ReminderController {
             reminder.setCreatedAt(LocalDate.now());
         }
 
+        // Validate interview times
+        validateInterviewTimes(reminder);
+
         // Save reminder first
         Reminder savedReminder = reminderRepository.save(reminder);
 
@@ -74,10 +108,44 @@ public class ReminderController {
                         currentUser.getGoogleAccessToken(),
                         currentUser.getTimezone()
                 );
-                // Store the Google Calendar event ID
-                savedReminder.setGoogleCalendarEventId(googleCalendarEventId);
+
+                // Only store calendar event ID if one was created (FOLLOWUP reminders return null)
+                if (googleCalendarEventId != null) {
+                    savedReminder.setGoogleCalendarEventId(googleCalendarEventId);
+                    System.out.println("[Google Calendar] ✓ Auto-synced reminder to Google Calendar: " + googleCalendarEventId);
+                }
+
+                // Create a Google Task ONLY for FOLLOWUP events (not DEADLINE)
+                System.out.println("[Google Tasks] Checking if should create task...");
+                System.out.println("[Google Tasks] - Kind: " + savedReminder.getKind());
+                System.out.println("[Google Tasks] - isGoogleTasksEnabled: " + currentUser.isGoogleTasksEnabled());
+                System.out.println("[Google Tasks] - Has token: " + (currentUser.getGoogleAccessToken() != null));
+
+                if ("FOLLOWUP".equals(savedReminder.getKind()) && currentUser.isGoogleTasksEnabled()) {
+                    System.out.println("[Google Tasks] ✓ Conditions met - creating task...");
+                    try {
+                        String googleTaskId = googleCalendarService.createGoogleTask(
+                                savedReminder,
+                                currentUser.getGoogleAccessToken()
+                        );
+                        savedReminder.setGoogleTaskId(googleTaskId);
+                        System.out.println("[Google Tasks] ✓ Auto-synced followup to Google Tasks: " + googleTaskId);
+                    } catch (Exception e) {
+                        System.err.println("[Google Tasks] ✗ Failed to create Google Task: " + e.getMessage());
+                        e.printStackTrace();
+                        // Don't fail the request - reminder is still created locally
+                    }
+                } else {
+                    System.out.println("[Google Tasks] ⊘ Skipping task creation - conditions not met");
+                    if (!"FOLLOWUP".equals(savedReminder.getKind())) {
+                        System.out.println("[Google Tasks]   - Kind is not FOLLOWUP (it's: " + savedReminder.getKind() + ")");
+                    }
+                    if (!currentUser.isGoogleTasksEnabled()) {
+                        System.out.println("[Google Tasks]   - Google Tasks not enabled for user");
+                    }
+                }
+
                 savedReminder = reminderRepository.save(savedReminder);
-                System.out.println("[Google Calendar] ✓ Auto-synced reminder to Google Calendar: " + googleCalendarEventId);
             } catch (Exception e) {
                 System.err.println("[Google Calendar] ✗ Failed to sync reminder to Google Calendar: " + e.getMessage());
                 e.printStackTrace();
@@ -116,6 +184,13 @@ public class ReminderController {
                         reminder.setMeetingLink(details.getMeetingLink());
                     }
 
+                    if ("FOLLOWUP".equals(reminder.getKind())) {
+                        reminder.setStartTime(details.getStartTime());
+                    }
+
+                    // Validate interview times
+                    validateInterviewTimes(reminder);
+
                     Reminder updatedReminder = reminderRepository.save(reminder);
 
                     // Auto-sync update to Google Calendar if enabled and event ID exists
@@ -132,6 +207,26 @@ public class ReminderController {
                             System.out.println("[Google Calendar] ✓ Auto-synced reminder update to Google Calendar: " + updatedReminder.getGoogleCalendarEventId());
                         } catch (Exception e) {
                             System.err.println("[Google Calendar] ✗ Failed to sync reminder update to Google Calendar: " + e.getMessage());
+                            e.printStackTrace();
+                            // Don't fail the request - reminder is still updated locally
+                        }
+                    }
+
+                    // Auto-sync update to Google Task if enabled and task ID exists
+                    // Only for FOLLOWUP reminders
+                    if (currentUser.isGoogleTasksEnabled() &&
+                            currentUser.getGoogleAccessToken() != null &&
+                            updatedReminder.getGoogleTaskId() != null &&
+                            "FOLLOWUP".equals(updatedReminder.getKind())) {
+                        try {
+                            googleCalendarService.updateGoogleTask(
+                                    updatedReminder.getGoogleTaskId(),
+                                    updatedReminder,
+                                    currentUser.getGoogleAccessToken()
+                            );
+                            System.out.println("[Google Tasks] ✓ Auto-synced followup update to Google Tasks: " + updatedReminder.getGoogleTaskId());
+                        } catch (Exception e) {
+                            System.err.println("[Google Tasks] ✗ Failed to sync followup update to Google Tasks: " + e.getMessage());
                             e.printStackTrace();
                             // Don't fail the request - reminder is still updated locally
                         }
@@ -160,6 +255,25 @@ public class ReminderController {
                             System.out.println("[Google Calendar] ✓ Auto-synced reminder deletion to Google Calendar: " + reminder.getGoogleCalendarEventId());
                         } catch (Exception e) {
                             System.err.println("[Google Calendar] ✗ Failed to sync reminder deletion to Google Calendar: " + e.getMessage());
+                            e.printStackTrace();
+                            // Don't fail the request - reminder is still deleted locally
+                        }
+                    }
+
+                    // Auto-sync deletion to Google Task if enabled and task ID exists
+                    // Only for FOLLOWUP reminders
+                    if (currentUser.isGoogleTasksEnabled() &&
+                            currentUser.getGoogleAccessToken() != null &&
+                            reminder.getGoogleTaskId() != null &&
+                            "FOLLOWUP".equals(reminder.getKind())) {
+                        try {
+                            googleCalendarService.deleteGoogleTask(
+                                    reminder.getGoogleTaskId(),
+                                    currentUser.getGoogleAccessToken()
+                            );
+                            System.out.println("[Google Tasks] ✓ Auto-synced followup deletion to Google Tasks: " + reminder.getGoogleTaskId());
+                        } catch (Exception e) {
+                            System.err.println("[Google Tasks] ✗ Failed to sync followup deletion to Google Tasks: " + e.getMessage());
                             e.printStackTrace();
                             // Don't fail the request - reminder is still deleted locally
                         }

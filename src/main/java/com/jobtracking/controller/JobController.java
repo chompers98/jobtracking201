@@ -37,10 +37,10 @@ public class JobController {
     private final ApplicationRepository applicationRepository;
 
     public JobController(JobRecommendationService recommendationService,
-                        UserRepository userRepository,
-                        UserAppliedJobRepository userAppliedJobRepository,
-                        JobRepository jobRepository,
-                        ApplicationRepository applicationRepository) {
+                         UserRepository userRepository,
+                         UserAppliedJobRepository userAppliedJobRepository,
+                         JobRepository jobRepository,
+                         ApplicationRepository applicationRepository) {
         this.recommendationService = recommendationService;
         this.userRepository = userRepository;
         this.userAppliedJobRepository = userAppliedJobRepository;
@@ -68,17 +68,25 @@ public class JobController {
     public List<Map<String, Object>> getJobs() {
         User currentUser = getCurrentUser();
         List<Job> jobs = recommendationService.getAllJobs();
-        
+
         // Get job IDs that the user has already applied to
         Set<UUID> appliedJobIds = new HashSet<>(
-            userAppliedJobRepository.findJobIdsByUserId(currentUser.getId())
+                userAppliedJobRepository.findJobIdsByUserId(currentUser.getId())
         );
-        
+
         // Filter out jobs that the user has already applied to
         return jobs.stream()
                 .filter(job -> !appliedJobIds.contains(job.getId()))
                 .map(this::convertToMap)
                 .collect(Collectors.toList());
+    }
+
+    /**
+     * GET /api/recommendations - Returns list of jobs (alias for /api/jobs for frontend compatibility)
+     */
+    @GetMapping("/recommendations")
+    public List<Map<String, Object>> getRecommendations() {
+        return getJobs();
     }
 
     // Trigger Adzuna fetch
@@ -101,19 +109,19 @@ public class JobController {
             @RequestParam(defaultValue = "20") int limit) {
 
         User currentUser = getCurrentUser();
-        
+
         // Get job IDs that the user has already applied to
         Set<UUID> appliedJobIds = new HashSet<>(
-            userAppliedJobRepository.findJobIdsByUserId(currentUser.getId())
+                userAppliedJobRepository.findJobIdsByUserId(currentUser.getId())
         );
 
         List<JobDto> results = recommendationService.recommendJobs(request.getSkills(), limit);
-        
+
         // Filter out jobs that the user has already applied to
         List<JobDto> filteredResults = results.stream()
                 .filter(job -> !appliedJobIds.contains(job.getId()))
                 .collect(Collectors.toList());
-        
+
         return ResponseEntity.ok(filteredResults);
     }
 
@@ -124,15 +132,15 @@ public class JobController {
     @PostMapping("/{jobId}/apply")
     public ResponseEntity<Map<String, Object>> applyToJob(@PathVariable UUID jobId) {
         User currentUser = getCurrentUser();
-        
+
         // Check if job exists
         Job job = jobRepository.findById(jobId)
                 .orElse(null);
-        
+
         if (job == null) {
             return ResponseEntity.notFound().build();
         }
-        
+
         // Check if user has already applied to this job
         if (userAppliedJobRepository.existsByUser_IdAndJob_Id(currentUser.getId(), jobId)) {
             Map<String, Object> response = new HashMap<>();
@@ -140,34 +148,34 @@ public class JobController {
             response.put("message", "You have already applied to this job");
             return ResponseEntity.badRequest().body(response);
         }
-        
+
         // Create an Application linked to the Job (FK relationship)
         Application application = new Application();
         application.setUser(currentUser);
         application.setJob(job); // Link to Job via FK - gives access to all job info
-        
+
         // Copy basic info for display purposes (in case job is deleted later)
         application.setCompany(job.getCompany());
         application.setTitle(job.getTitle());
-        
+
         // Don't copy location/salary/link - access through job FK instead
-        application.setNotes("[Applied from job recommendation]\n" + 
-                           (job.getDescription() != null ? job.getDescription() : ""));
+        application.setNotes("[Applied from job recommendation]\n" +
+                (job.getDescription() != null ? job.getDescription() : ""));
         application.setStatus("APPLIED");
         application.setCreatedAt(LocalDate.now());
         application.setAppliedAt(LocalDate.now());
-        
+
         applicationRepository.save(application);
-        
+
         // Track that this user has applied to this job
         UserAppliedJob userAppliedJob = new UserAppliedJob(currentUser, job);
         userAppliedJobRepository.save(userAppliedJob);
-        
+
         Map<String, Object> response = new HashMap<>();
         response.put("success", true);
         response.put("message", "Successfully applied to job");
         response.put("applicationId", application.getId());
-        
+
         return ResponseEntity.ok(response);
     }
 
@@ -178,7 +186,7 @@ public class JobController {
         map.put("company", job.getCompany());
         map.put("salary", job.getSalary());
         // job_type is not in Adzuna model currently, defaulting to empty or "Full-time" if you want
-        map.put("job_type", "Full-time"); 
+        map.put("job_type", "Full-time");
         map.put("location", job.getLocation());
         map.put("description", job.getDescription());
         map.put("job_link", job.getExternalUrl());

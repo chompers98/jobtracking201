@@ -1274,8 +1274,19 @@ async function initRecommendationsPage() {
     }
 
     try {
+        console.log("[Recommendations] Loading jobs from /api/jobs...");
         allJobs = await fetchJson("/api/jobs");
+        console.log("[Recommendations] ✓ Loaded " + (allJobs ? allJobs.length : 0) + " jobs");
+
+        if (!allJobs || allJobs.length === 0) {
+            console.warn("[Recommendations] ⚠ No jobs returned from API");
+            tableBody.innerHTML = "<tr><td colspan='5' style='text-align:center;padding:20px;'>No jobs available. Please try fetching jobs again.</td></tr>";
+            if (countLabel) countLabel.textContent = "0 jobs";
+            return;
+        }
+
         render(allJobs);
+        console.log("[Recommendations] ✓ Rendered jobs in table");
 
         if (searchInput) {
             searchInput.addEventListener("input", (e) => {
@@ -1289,7 +1300,9 @@ async function initRecommendationsPage() {
             });
         }
     } catch (err) {
-        console.error("Failed to load recommendations:", err);
+        console.error("[Recommendations] ✗ Failed to load recommendations:", err);
+        console.error("[Recommendations] Error stack:", err.stack);
+        tableBody.innerHTML = "<tr><td colspan='5' style='text-align:center;padding:20px;color:red;'>Error loading jobs: " + err.message + "</td></tr>";
     }
 }
 

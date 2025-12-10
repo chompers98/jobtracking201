@@ -40,6 +40,12 @@ public class User {
     @Column(name = "google_calendar_enabled")
     private boolean googleCalendarEnabled = false;
 
+    @Column(name = "google_tasks_enabled")
+    private boolean googleTasksEnabled = false;
+
+    @Column(name = "google_gmail_enabled")
+    private boolean googleGmailEnabled = false;
+
     @Column(name = "google_access_token", columnDefinition = "TEXT")
     private String googleAccessToken;
 
@@ -106,6 +112,12 @@ public class User {
     // Google Calendar Integration Getters and Setters
     public boolean isGoogleCalendarEnabled() { return googleCalendarEnabled; }
     public void setGoogleCalendarEnabled(boolean googleCalendarEnabled) { this.googleCalendarEnabled = googleCalendarEnabled; }
+
+    public boolean isGoogleTasksEnabled() { return googleTasksEnabled; }
+    public void setGoogleTasksEnabled(boolean googleTasksEnabled) { this.googleTasksEnabled = googleTasksEnabled; }
+
+    public boolean isGoogleGmailEnabled() { return googleGmailEnabled; }
+    public void setGoogleGmailEnabled(boolean googleGmailEnabled) { this.googleGmailEnabled = googleGmailEnabled; }
 
     public String getGoogleAccessToken() { return googleAccessToken; }
     public void setGoogleAccessToken(String googleAccessToken) { this.googleAccessToken = googleAccessToken; }

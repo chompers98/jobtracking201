@@ -86,7 +86,7 @@
               <div class="integration-info">
                 <div class="integration-title-row">
                   <h3>Google</h3>
-                  <span class="integration-badge">Gmail + Calendar</span>
+                  <span class="integration-badge">Gmail + Calendar + Tasks</span>
                 </div>
                 <p class="muted">Track job applications from email and sync deadlines to your calendar</p>
               </div>
@@ -126,8 +126,15 @@
                   <label class="service-toggle-item">
                     <input type="checkbox" id="enable-calendar" checked />
                     <div class="service-toggle-content">
-                      <span class="service-toggle-label">Calendar Sync</span>
-                      <span class="service-toggle-desc">Sync interview dates and deadlines to your calendar</span>
+                      <span class="service-toggle-label">Google Calendar</span>
+                      <span class="service-toggle-desc">Sync interview dates and application deadlines to your calendar</span>
+                    </div>
+                  </label>
+                  <label class="service-toggle-item">
+                    <input type="checkbox" id="enable-tasks" checked />
+                    <div class="service-toggle-content">
+                      <span class="service-toggle-label">Google Tasks</span>
+                      <span class="service-toggle-desc">Create task reminders for job application follow-ups</span>
                     </div>
                   </label>
                 </div>
@@ -217,6 +224,7 @@
 
             document.getElementById("enable-gmail").checked = google.gmailEnabled;
             document.getElementById("enable-calendar").checked = google.calendarEnabled;
+            document.getElementById("enable-tasks").checked = google.tasksEnabled;
           }
           
         } catch (error) {
@@ -286,11 +294,12 @@
         
         const gmailEnabled = document.getElementById("enable-gmail").checked;
         const calendarEnabled = document.getElementById("enable-calendar").checked;
+        const tasksEnabled = document.getElementById("enable-tasks").checked;
         const toggleEnabled = document.getElementById("google-toggle").checked;
 
         // Check if at least one service is enabled
-        if (!gmailEnabled && !calendarEnabled) {
-          alert("Please enable at least one service (Gmail or Calendar)");
+        if (!gmailEnabled && !calendarEnabled && !tasksEnabled) {
+          alert("Please enable at least one service (Gmail, Calendar, or Tasks)");
           return;
         }
 
@@ -307,6 +316,7 @@
                 enabled: toggleEnabled,
                 gmailEnabled: gmailEnabled,
                 calendarEnabled: calendarEnabled,
+                tasksEnabled: tasksEnabled,
               }
             }),
           });

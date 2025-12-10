@@ -10,6 +10,7 @@ import com.google.api.client.json.gson.GsonFactory;
 import com.google.api.client.util.store.FileDataStoreFactory;
 import com.google.api.services.gmail.GmailScopes;
 import com.google.api.services.calendar.CalendarScopes;
+import com.google.api.services.tasks.TasksScopes;
 import com.jobtracking.dto.AuthResponse;
 import com.jobtracking.dto.LoginRequest;
 import com.jobtracking.dto.RegisterRequest;
@@ -44,7 +45,8 @@ public class AuthController {
     private static final JsonFactory JSON_FACTORY = GsonFactory.getDefaultInstance();
     private static final List<String> SCOPES = Arrays.asList(
             GmailScopes.GMAIL_READONLY,      // Read Gmail (for future email tracking)
-            CalendarScopes.CALENDAR           // Read/write Google Calendar (for event syncing)
+            CalendarScopes.CALENDAR,          // Read/write Google Calendar (for event syncing)
+            "https://www.googleapis.com/auth/tasks"  // Read/write Google Tasks (for followup reminders)
     );
 
     // User integration settings store (Mock for now, ideally DB)
@@ -192,6 +194,8 @@ public class AuthController {
                         user.setGoogleRefreshToken(tokenResponse.getRefreshToken());
                     }
                     user.setGoogleCalendarEnabled(true);
+                    user.setGoogleTasksEnabled(true);
+                    user.setGoogleGmailEnabled(true);
                     authenticationService.getUserRepository().save(user);
                     authenticationService.getUserRepository().flush();
 
@@ -282,6 +286,8 @@ public class AuthController {
                 User user = authenticationService.getUserRepository().findByEmail(email).orElse(null);
                 if (user != null) {
                     user.setGoogleCalendarEnabled(false);
+                    user.setGoogleTasksEnabled(false);
+                    user.setGoogleGmailEnabled(false);
                     user.setGoogleAccessToken(null);
                     user.setGoogleRefreshToken(null);
                     authenticationService.getUserRepository().save(user);

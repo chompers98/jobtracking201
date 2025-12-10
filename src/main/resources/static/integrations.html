@@ -3,6 +3,13 @@
   <head>
     <meta charset="UTF-8" />
     <title>JobTracker – Settings</title>
+    <script>
+      // Apply theme immediately to prevent flash
+      (function() {
+        const theme = localStorage.getItem('theme') || 'light';
+        document.documentElement.setAttribute('data-theme', theme);
+      })();
+    </script>
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
@@ -55,13 +62,31 @@
             </div>
           </div>
 
+          <!-- Appearance Settings -->
+          <section class="card integration-card">
+            <div class="integration-header" style="border-bottom: none; padding-bottom: 0;">
+              <div class="integration-info">
+                <h3>Appearance</h3>
+                <p class="muted">Toggle between light and dark mode</p>
+              </div>
+              <div class="theme-toggle-container">
+                <span class="theme-icon" id="sun-icon">☀️</span>
+                <label class="switch">
+                  <input type="checkbox" id="theme-toggle" />
+                  <span class="slider"></span>
+                </label>
+                <span class="theme-icon" id="moon-icon">🌙</span>
+              </div>
+            </div>
+          </section>
+
           <!-- Google Integration (Combined Gmail & Calendar) -->
           <section class="card integration-card">
             <div class="integration-header">
               <div class="integration-info">
                 <div class="integration-title-row">
                   <h3>Google</h3>
-                  <span class="integration-badge">Gmail + Calendar</span>
+                  <span class="integration-badge">Gmail + Calendar + Tasks</span>
                 </div>
                 <p class="muted">Track job applications from email and sync deadlines to your calendar</p>
               </div>
@@ -101,8 +126,15 @@
                   <label class="service-toggle-item">
                     <input type="checkbox" id="enable-calendar" checked />
                     <div class="service-toggle-content">
-                      <span class="service-toggle-label">Calendar Sync</span>
-                      <span class="service-toggle-desc">Sync interview dates and deadlines to your calendar</span>
+                      <span class="service-toggle-label">Google Calendar</span>
+                      <span class="service-toggle-desc">Sync interview dates and application deadlines to your calendar</span>
+                    </div>
+                  </label>
+                  <label class="service-toggle-item">
+                    <input type="checkbox" id="enable-tasks" checked />
+                    <div class="service-toggle-content">
+                      <span class="service-toggle-label">Google Tasks</span>
+                      <span class="service-toggle-desc">Create task reminders for job application follow-ups</span>
                     </div>
                   </label>
                 </div>
@@ -192,6 +224,7 @@
 
             document.getElementById("enable-gmail").checked = google.gmailEnabled;
             document.getElementById("enable-calendar").checked = google.calendarEnabled;
+            document.getElementById("enable-tasks").checked = google.tasksEnabled;
           }
           
         } catch (error) {
@@ -261,11 +294,12 @@
         
         const gmailEnabled = document.getElementById("enable-gmail").checked;
         const calendarEnabled = document.getElementById("enable-calendar").checked;
+        const tasksEnabled = document.getElementById("enable-tasks").checked;
         const toggleEnabled = document.getElementById("google-toggle").checked;
 
         // Check if at least one service is enabled
-        if (!gmailEnabled && !calendarEnabled) {
-          alert("Please enable at least one service (Gmail or Calendar)");
+        if (!gmailEnabled && !calendarEnabled && !tasksEnabled) {
+          alert("Please enable at least one service (Gmail, Calendar, or Tasks)");
           return;
         }
 
@@ -282,9 +316,14 @@
                 enabled: toggleEnabled,
                 gmailEnabled: gmailEnabled,
                 calendarEnabled: calendarEnabled,
+                tasksEnabled: tasksEnabled,
               }
             }),
           });
+
+          // Store JWT in cookie before OAuth redirect (so it persists across the redirect)
+          document.cookie = `jwtToken=${localStorage.getItem('jwtToken')}; path=/`;
+          console.log("[Google OAuth] JWT stored in cookie");
 
           // Redirect to OAuth flow
           window.location.href = "/api/oauth/google/authorize";
@@ -300,7 +339,47 @@
       // Load settings on page load
       document.addEventListener("DOMContentLoaded", () => {
         loadIntegrationSettings();
+        initThemeSettings();
       });
+
+      // Theme toggle functionality
+      function initThemeSettings() {
+        const savedTheme = localStorage.getItem('theme') || 'light';
+        const themeToggle = document.getElementById('theme-toggle');
+        const sunIcon = document.getElementById('sun-icon');
+        const moonIcon = document.getElementById('moon-icon');
+        
+        // Set initial state
+        updateThemeUI(savedTheme);
+        
+        // Toggle switch handler
+        themeToggle.addEventListener('change', (e) => {
+          const theme = e.target.checked ? 'dark' : 'light';
+          applyTheme(theme);
+        });
+      }
+      
+      function updateThemeUI(theme) {
+        const themeToggle = document.getElementById('theme-toggle');
+        const sunIcon = document.getElementById('sun-icon');
+        const moonIcon = document.getElementById('moon-icon');
+        
+        if (theme === 'dark') {
+          themeToggle.checked = true;
+          sunIcon.classList.remove('active');
+          moonIcon.classList.add('active');
+        } else {
+          themeToggle.checked = false;
+          sunIcon.classList.add('active');
+          moonIcon.classList.remove('active');
+        }
+      }
+      
+      function applyTheme(theme) {
+        document.documentElement.setAttribute('data-theme', theme);
+        localStorage.setItem('theme', theme);
+        updateThemeUI(theme);
+      }
     </script>
   </body>
 </html>

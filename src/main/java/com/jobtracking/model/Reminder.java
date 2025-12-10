@@ -60,6 +60,9 @@ public class Reminder {
     @Column(name = "google_calendar_event_id")
     private String googleCalendarEventId;
 
+    @Column(name = "google_task_id")
+    private String googleTaskId;
+
     public Reminder() {}
 
     // Getters and Setters
@@ -107,6 +110,9 @@ public class Reminder {
 
     public String getGoogleCalendarEventId() { return googleCalendarEventId; }
     public void setGoogleCalendarEventId(String googleCalendarEventId) { this.googleCalendarEventId = googleCalendarEventId; }
+
+    public String getGoogleTaskId() { return googleTaskId; }
+    public void setGoogleTaskId(String googleTaskId) { this.googleTaskId = googleTaskId; }
 
     public User getUser() { return user; }
     public void setUser(User user) { this.user = user; }
