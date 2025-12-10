@@ -173,24 +173,6 @@
               <label for="event-end-date">End Date (Optional)</label>
               <input type="date" id="event-end-date" />
             </div>
-            <div class="form-row">
-              <div class="form-group">
-                <label for="event-start-time">Start Time</label>
-                <input type="time" id="event-start-time" />
-              </div>
-              <div class="form-group">
-                <label for="event-end-time">End Time</label>
-                <input type="time" id="event-end-time" />
-              </div>
-            </div>
-            <div class="form-group">
-              <label for="event-location">Location</label>
-              <input type="text" id="event-location" placeholder="Office, address, etc." />
-            </div>
-            <div class="form-group">
-              <label for="event-meeting-link">Meeting Link</label>
-              <input type="url" id="event-meeting-link" placeholder="Zoom, Google Meet, etc." />
-            </div>
           </div>
 
           <!-- Assignment-specific fields -->
@@ -198,6 +180,39 @@
             <div class="form-group">
               <label for="event-assignment-deadline">Deadline</label>
               <input type="date" id="event-assignment-deadline" />
+            </div>
+          </div>
+
+          <!-- Optional time fields (available for all event types) -->
+          <div id="time-fields" style="display: block;">
+            <!-- For DEADLINE and FOLLOWUP: single time field -->
+            <div id="single-time-field" style="display: block;">
+              <div class="form-group">
+                <label for="event-time">Time (Optional)</label>
+                <input type="time" id="event-time" />
+              </div>
+              <div class="form-group">
+                <label for="event-location">Location (Optional)</label>
+                <input type="text" id="event-location" placeholder="Office, address, etc." />
+              </div>
+            </div>
+            
+            <!-- For INTERVIEW: start and end times -->
+            <div id="interview-time-fields" style="display: none;">
+              <div class="form-row">
+                <div class="form-group">
+                  <label for="event-start-time">Start Time</label>
+                  <input type="time" id="event-start-time" />
+                </div>
+                <div class="form-group">
+                  <label for="event-end-time">End Time</label>
+                  <input type="time" id="event-end-time" />
+                </div>
+              </div>
+              <div class="form-group">
+                <label for="event-meeting-link">Meeting Link (Optional)</label>
+                <input type="url" id="event-meeting-link" placeholder="Zoom, Google Meet, etc." />
+              </div>
             </div>
           </div>
 

@@ -1034,14 +1034,25 @@ async function openEventModal(eventId = null, prefilledAppId = null) {
         } else if (event.kind === "INTERVIEW") {
             document.getElementById("event-start-date").value = triggerAt;
             document.getElementById("event-end-date").value = endDate;
-            document.getElementById("event-start-time").value = startTime;
-            document.getElementById("event-end-time").value = endTime;
-            document.getElementById("event-location").value = event.location || "";
-            document.getElementById("event-meeting-link").value = meetingLink;
         } else if (event.kind === "FOLLOWUP") {
             const assignmentDeadline = document.getElementById("event-assignment-deadline");
             if (assignmentDeadline) assignmentDeadline.value = triggerAt;
         }
+
+        // Populate time fields based on event type
+        if (event.kind === "INTERVIEW") {
+            // Interview: populate start and end times
+            document.getElementById("event-start-time").value = startTime;
+            document.getElementById("event-end-time").value = endTime;
+            const meetingLinkEl = document.getElementById("event-meeting-link");
+            if (meetingLinkEl) meetingLinkEl.value = meetingLink;
+        } else {
+            // Deadline and Follow-up: single time field
+            document.getElementById("event-time").value = startTime;
+        }
+
+        // Location is available for all types
+        document.getElementById("event-location").value = event.location || "";
     } else {
         form.reset();
         eventTypeSelect.value = "DEADLINE"; // Default to DEADLINE
@@ -1053,6 +1064,11 @@ async function openEventModal(eventId = null, prefilledAppId = null) {
 
     // Show/hide fields based on event type
     updateEventFormFields(eventTypeSelect.value);
+
+    // Add listener for event type changes
+    eventTypeSelect.addEventListener("change", (e) => {
+        updateEventFormFields(e.target.value);
+    });
 
     // Handle form submission
     const submitBtn = document.getElementById("event-submit-btn");
@@ -1088,22 +1104,30 @@ function updateEventFormFields(eventType) {
     const applicationFields = document.getElementById("application-fields");
     const interviewFields = document.getElementById("interview-fields");
     const assignmentFields = document.getElementById("assignment-fields");
+    const singleTimeField = document.getElementById("single-time-field");
+    const interviewTimeFields = document.getElementById("interview-time-fields");
 
-    // Map kinds to UI sections
-    // DEADLINE -> applicationFields (has 'event-deadline')
-    // INTERVIEW -> interviewFields
-    // FOLLOWUP -> assignmentFields (has 'event-assignment-deadline')
-
+    // Show type-specific date fields
     if (applicationFields) applicationFields.style.display = eventType === "DEADLINE" ? "block" : "none";
     if (interviewFields) interviewFields.style.display = eventType === "INTERVIEW" ? "block" : "none";
     if (assignmentFields) assignmentFields.style.display = eventType === "FOLLOWUP" ? "block" : "none";
+
+    // Show appropriate time fields based on event type
+    if (eventType === "INTERVIEW") {
+        if (singleTimeField) singleTimeField.style.display = "none";
+        if (interviewTimeFields) interviewTimeFields.style.display = "block";
+    } else {
+        // For DEADLINE and FOLLOWUP: show single time field
+        if (singleTimeField) singleTimeField.style.display = "block";
+        if (interviewTimeFields) interviewTimeFields.style.display = "none";
+    }
 }
 
 async function saveEvent(eventId) {
     const eventType = document.getElementById("event-type").value;
     const eventTitle = document.getElementById("event-title").value;
     const eventApplicationDropdown = document.getElementById("event-application-dropdown");
-    const eventApplicationId = eventApplicationDropdown.value; // Get from dropdown
+    const eventApplicationId = eventApplicationDropdown.value;
     const eventNotes = document.getElementById("event-notes").value;
     const eventColor = document.getElementById("event-color").value;
 
@@ -1115,10 +1139,13 @@ async function saveEvent(eventId) {
     const payload = {
         kind: eventType,
         title: eventTitle,
-        applicationId: eventApplicationId || null,  // Will be UUID string or empty
+        applicationId: eventApplicationId || null,
         notes: eventNotes,
         color: eventColor,
     };
+
+    // Get location (available for all types)
+    const location = document.getElementById("event-location")?.value;
 
     // Add type-specific fields
     if (eventType === "DEADLINE") {
@@ -1128,6 +1155,10 @@ async function saveEvent(eventId) {
             return;
         }
         payload.triggerAt = deadline;
+        // Single time field for deadline
+        const time = document.getElementById("event-time")?.value;
+        if (time) payload.startTime = time;
+        if (location) payload.location = location;
     } else if (eventType === "INTERVIEW") {
         const startDate = document.getElementById("event-start-date").value;
         if (!startDate) {
@@ -1136,10 +1167,12 @@ async function saveEvent(eventId) {
         }
         payload.triggerAt = startDate;
         payload.endDate = document.getElementById("event-end-date").value || startDate;
+        // Start and end times for interview
         payload.startTime = document.getElementById("event-start-time").value;
         payload.endTime = document.getElementById("event-end-time").value;
-        payload.location = document.getElementById("event-location").value;
-        payload.meetingLink = document.getElementById("event-meeting-link").value;
+        const meetingLink = document.getElementById("event-meeting-link")?.value;
+        if (meetingLink) payload.meetingLink = meetingLink;
+        if (location) payload.location = location;
     } else if (eventType === "FOLLOWUP") {
         const deadline = document.getElementById("event-assignment-deadline").value;
         if (!deadline) {
@@ -1147,6 +1180,17 @@ async function saveEvent(eventId) {
             return;
         }
         payload.triggerAt = deadline;
+        // Single time field for follow-up
+        const time = document.getElementById("event-time")?.value;
+        if (time) payload.startTime = time;
+        if (location) payload.location = location;
+    }
+
+    // Disable submit button to prevent double-click
+    const submitBtn = document.getElementById("event-submit-btn");
+    if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.style.opacity = "0.6";
     }
 
     try {
@@ -1166,6 +1210,12 @@ async function saveEvent(eventId) {
     } catch (err) {
         console.error("Failed to save reminder:", err);
         alert("Failed to save reminder. Please try again.");
+
+        // Re-enable button if there's an error
+        if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.style.opacity = "1";
+        }
     }
 }
 
