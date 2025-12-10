@@ -1123,6 +1123,47 @@ function updateEventFormFields(eventType) {
     }
 }
 
+// Validate that date is within acceptable range (1900-01-01 to 3 years from now)
+function validateDateRange(dateString) {
+    if (!dateString) {
+        return { valid: false, message: 'Date is required' };
+    }
+
+    // Parse the date string
+    const date = new Date(dateString + 'T00:00:00Z');
+
+    // Check if date is valid
+    if (isNaN(date.getTime())) {
+        return { valid: false, message: 'Invalid date format' };
+    }
+
+    // Set min and max dates
+    const minDate = new Date('1900-01-01T00:00:00Z');
+    const today = new Date();
+    const maxDate = new Date(today.getFullYear() + 3, today.getMonth(), today.getDate());
+
+    // Normalize dates for comparison
+    const checkDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+    const checkMin = new Date(1900, 0, 1);
+    const checkMax = new Date(maxDate.getFullYear(), maxDate.getMonth(), maxDate.getDate());
+
+    if (checkDate < checkMin) {
+        return {
+            valid: false,
+            message: `Date cannot be before January 1, 1900`
+        };
+    }
+
+    if (checkDate > checkMax) {
+        return {
+            valid: false,
+            message: `Date cannot be more than 3 years in the future (max: ${checkMax.toLocaleDateString()})`
+        };
+    }
+
+    return { valid: true };
+}
+
 async function saveEvent(eventId) {
     const eventType = document.getElementById("event-type").value;
     const eventTitle = document.getElementById("event-title").value;
@@ -1133,6 +1174,13 @@ async function saveEvent(eventId) {
 
     if (!eventTitle) {
         alert("Please enter a title");
+        return;
+    }
+
+    // Check for any date input fields with error styling (red border)
+    const dateInputsWithErrors = document.querySelectorAll('input[type="date"][style*="border-color: rgb(239, 68, 68)"]');
+    if (dateInputsWithErrors.length > 0) {
+        alert("Please fix the invalid dates before saving");
         return;
     }
 
@@ -1154,6 +1202,14 @@ async function saveEvent(eventId) {
             alert("Please enter a deadline");
             return;
         }
+
+        // Validate date range
+        const dateValidation = validateDateRange(deadline);
+        if (!dateValidation.valid) {
+            alert(dateValidation.message);
+            return;
+        }
+
         payload.triggerAt = deadline;
         // Single time field for deadline
         const time = document.getElementById("event-time")?.value;
@@ -1165,8 +1221,26 @@ async function saveEvent(eventId) {
             alert("Please enter a start date");
             return;
         }
+
+        // Validate date range
+        const dateValidation = validateDateRange(startDate);
+        if (!dateValidation.valid) {
+            alert(dateValidation.message);
+            return;
+        }
+
         payload.triggerAt = startDate;
         payload.endDate = document.getElementById("event-end-date").value || startDate;
+
+        // Also validate end date if provided
+        if (payload.endDate && payload.endDate !== startDate) {
+            const endDateValidation = validateDateRange(payload.endDate);
+            if (!endDateValidation.valid) {
+                alert(endDateValidation.message);
+                return;
+            }
+        }
+
         // Start and end times for interview
         payload.startTime = document.getElementById("event-start-time").value;
         payload.endTime = document.getElementById("event-end-time").value;
@@ -1179,6 +1253,14 @@ async function saveEvent(eventId) {
             alert("Please enter a deadline");
             return;
         }
+
+        // Validate date range
+        const dateValidation = validateDateRange(deadline);
+        if (!dateValidation.valid) {
+            alert(dateValidation.message);
+            return;
+        }
+
         payload.triggerAt = deadline;
         // Single time field for follow-up
         const time = document.getElementById("event-time")?.value;
