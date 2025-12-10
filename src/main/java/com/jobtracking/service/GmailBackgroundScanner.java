@@ -95,12 +95,15 @@ public class GmailBackgroundScanner {
      */
     @Scheduled(fixedRate = 60000) // Run every 60 seconds
     public void scanInbox() {
+        System.out.println("[GmailScanner] ===== SCAN TRIGGERED AT " + java.time.LocalDateTime.now() + " =====");
+        
         // Don't scan if not connected/enabled
         Boolean enabled = (Boolean) AuthController.googleIntegration.get("enabled");
         Boolean connected = (Boolean) AuthController.googleIntegration.get("connected");
         UUID connectedUserId = (UUID) AuthController.googleIntegration.get("connectedUserId");
 
         if (enabled == null || !enabled || connected == null || !connected) {
+            System.out.println("Not connected");
             return;
         }
 

@@ -8,16 +8,19 @@ import java.util.regex.Pattern;
 public class EmailParserService {
 
     private static final Pattern INTERVIEW_PATTERN = Pattern.compile(
-            "(?i)(interview|schedule a time|availability|coding challenge|technical screen)"
+        "(?i)(interview|schedule a time|availability|coding challenge|technical screen|phone screen)"
     );
+
     private static final Pattern OFFER_PATTERN = Pattern.compile(
-            "(?i)(offer letter|congratulations|pleased to offer|welcome to the team)"
+        "(?i)(offer letter|congratulations|pleased to offer|welcome to the team)"
     );
+
     private static final Pattern REJECT_PATTERN = Pattern.compile(
-            "(?i)(thank you for your interest|unfortunately|not moving forward|pursue other candidates)"
+        "(?i)(we (have )?decided|unfortunately[, ]|not moving forward|pursue other candidates)"
     );
+
     private static final Pattern APPLIED_PATTERN = Pattern.compile(
-            "(?i)(application received|successfully submitted|application confirmation|thank you for applying)"
+    "(?i)(application (received|submitted|confirmation)|thank you for applying|we (have )?received your application)"
     );
 
     // Company extraction patterns
