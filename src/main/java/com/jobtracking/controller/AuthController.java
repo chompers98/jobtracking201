@@ -196,6 +196,8 @@ public class AuthController {
                     user.setGoogleCalendarEnabled(true);
                     user.setGoogleTasksEnabled(true);
                     user.setGoogleGmailEnabled(true);
+                    // Update timestamp to mark user as active/logged in
+                    user.setUpdatedAt(java.time.LocalDateTime.now());
                     authenticationService.getUserRepository().save(user);
                     authenticationService.getUserRepository().flush();
 
@@ -203,6 +205,14 @@ public class AuthController {
                     User verify = authenticationService.getUserRepository().findByEmail(email).orElse(null);
                     if (verify != null && verify.isGoogleCalendarEnabled()) {
                         System.out.println("[Google OAuth] ✓ Tokens saved for " + email);
+                        
+                        // Update static map so GmailBackgroundScanner knows we're connected
+                        googleIntegration.put("enabled", true);
+                        googleIntegration.put("connected", true);
+                        googleIntegration.put("connectedUserId", user.getId());
+                        googleIntegration.put("email", email);
+                        googleIntegration.put("gmailEnabled", true);
+                        System.out.println("[Google OAuth] ✓ Updated googleIntegration map for Gmail scanning");
                     } else {
                         System.out.println("[Google OAuth] ✗ Save verification failed for " + email);
                     }
@@ -339,4 +349,5 @@ public class AuthController {
                 .setAccessType("offline")
                 .build();
     }
+
 }

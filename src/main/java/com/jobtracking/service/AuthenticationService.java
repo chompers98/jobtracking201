@@ -85,6 +85,10 @@ public class AuthenticationService {
             }
 
             User user = userOptional.get();
+            
+            // Update user's updatedAt timestamp to mark them as currently active/logged in
+            user.setUpdatedAt(java.time.LocalDateTime.now());
+            userRepository.save(user);
 
             // Generate JWT tokens
             String jwt = jwtTokenProvider.generateToken(authentication);
